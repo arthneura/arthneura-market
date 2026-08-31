@@ -1,8 +1,12 @@
 package main
 
 import (
-    "fmt"
+    "log"
     "os"
+    "os/signal"
+    "syscall"
+
+    "github.com/arthneura/arthneura-market/internal/indexer"
 )
 
 func main() {
@@ -10,5 +14,15 @@ func main() {
     if ws == "" {
         ws = "ws://127.0.0.1:9944"
     }
-    fmt.Println("arthneura-market indexer stub, chain=", ws)
+
+    go func() {
+        if err := indexer.Run(ws); err != nil {
+            log.Fatal(err)
+        }
+    }()
+
+    ch := make(chan os.Signal, 1)
+    signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
+    <-ch
+    log.Printf("indexer stop")
 }
