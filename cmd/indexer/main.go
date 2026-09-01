@@ -1,6 +1,7 @@
 package main
 
 import (
+    "context"
     "log"
     "os"
     "os/signal"
@@ -14,15 +15,16 @@ func main() {
     if ws == "" {
         ws = "ws://127.0.0.1:9944"
     }
+    dsn := os.Getenv("DATABASE_URL")
+    if dsn == "" {
+        dsn = "postgres://arthneura:arthneura@127.0.0.1:5432/arthneura_market?sslmode=disable"
+    }
 
-    go func() {
-        if err := indexer.Run(ws); err != nil {
-            log.Fatal(err)
-        }
-    }()
+    ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+    defer stop()
 
-    ch := make(chan os.Signal, 1)
-    signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
-    <-ch
+    if err := indexer.Run(ctx, ws, dsn); err != nil && err != context.Canceled {
+        log.Fatal(err)
+    }
     log.Printf("indexer stop")
 }
