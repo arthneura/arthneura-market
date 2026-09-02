@@ -49,7 +49,7 @@ type EventVectorDbDisputeRaised struct {
     Phase               types.Phase
     CommitmentID        [32]byte
     MerkleRoot          [32]byte
-    DisputedChunkIndex  types.U32
+    DisputedChunkIndex  types.U64
     ReceivedChunkHash   [32]byte
     CounterDeadline     types.U32
     Topics              []types.Hash
@@ -103,9 +103,18 @@ type EventEscrowFundsRefunded struct {
     Topics    []types.Hash
 }
 
+type EventAgentRegistryReputationSlashed struct {
+    Phase     types.Phase
+    Did       [32]byte
+    Amount    types.U32
+    NewScore  types.U32
+    Topics    []types.Hash
+}
+
 type EventRecords struct {
     types.EventRecords
     AgentRegistry_AgentRegistered     []EventAgentRegistryAgentRegistered
+    AgentRegistry_ReputationSlashed   []EventAgentRegistryReputationSlashed
     VectorDb_CommitmentRegistered     []EventVectorDbCommitmentRegistered
     VectorDb_CommitmentAcknowledged   []EventVectorDbCommitmentAcknowledged
     VectorDb_CommitmentSettled        []EventVectorDbCommitmentSettled
