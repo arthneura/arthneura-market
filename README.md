@@ -13,15 +13,16 @@ Postgres:
 
     docker start arthneura-pg
 
-Indexer (writes chain events to Postgres):
+Indexer:
 
     go run ./cmd/indexer
 
-Discovery API (reads Postgres):
+Discovery API:
 
     go run ./cmd/api
     curl -s http://127.0.0.1:8080/health
     curl -s http://127.0.0.1:8080/v1/agents
+    curl -s http://127.0.0.1:8080/v1/commitments
 
 First boot of Postgres (only once):
 
@@ -32,3 +33,4 @@ First boot of Postgres (only once):
       -p 5432:5432 \
       postgres:16
     docker exec -i arthneura-pg psql -U arthneura -d arthneura_market < db/migrations/001_init.sql
+    docker exec -i arthneura-pg psql -U arthneura -d arthneura_market < db/migrations/002_commitments_fields.sql

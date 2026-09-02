@@ -40,6 +40,30 @@ func NewMux(db *store.Store) *http.ServeMux {
         }
         writeJSON(w, http.StatusOK, agent)
     })
+    mux.HandleFunc("GET /v1/commitments", func(w http.ResponseWriter, r *http.Request) {
+        items, err := db.ListCommitments(r.Context())
+        if err != nil {
+            writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+            return
+        }
+        if items == nil {
+            items = []store.Commitment{}
+        }
+        writeJSON(w, http.StatusOK, map[string]any{"commitments": items})
+    })
+    mux.HandleFunc("GET /v1/commitments/{id}", func(w http.ResponseWriter, r *http.Request) {
+        id := strings.TrimSpace(r.PathValue("id"))
+        item, err := db.GetCommitment(r.Context(), id)
+        if errors.Is(err, pgx.ErrNoRows) {
+            writeJSON(w, http.StatusNotFound, map[string]string{"error": "commitment not found"})
+            return
+        }
+        if err != nil {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+            return
+        }
+        writeJSON(w, http.StatusOK, item)
+    })
     return mux
 }
 
