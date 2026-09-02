@@ -30,10 +30,92 @@ type EventVectorDbCommitmentRegistered struct {
     Topics       []types.Hash
 }
 
+type EventVectorDbCommitmentAcknowledged struct {
+    Phase           types.Phase
+    CommitmentID    [32]byte
+    AcknowledgedAt  types.U32
+    Topics          []types.Hash
+}
+
+type EventVectorDbCommitmentSettled struct {
+    Phase           types.Phase
+    CommitmentID    [32]byte
+    FinalStreamHash [32]byte
+    ChunkCount      types.U64
+    Topics          []types.Hash
+}
+
+type EventVectorDbDisputeRaised struct {
+    Phase               types.Phase
+    CommitmentID        [32]byte
+    MerkleRoot          [32]byte
+    DisputedChunkIndex  types.U32
+    ReceivedChunkHash   [32]byte
+    CounterDeadline     types.U32
+    Topics              []types.Hash
+}
+
+type EventVectorDbDisputeCountered struct {
+    Phase        types.Phase
+    CommitmentID [32]byte
+    Verdict      types.U8
+    Topics       []types.Hash
+}
+
+type EventVectorDbDisputeFinalized struct {
+    Phase        types.Phase
+    CommitmentID [32]byte
+    Verdict      types.U8
+    Provider     [32]byte
+    Consumer     [32]byte
+    Topics       []types.Hash
+}
+
+type EventVectorDbCommitmentExpired struct {
+    Phase        types.Phase
+    CommitmentID [32]byte
+    Topics       []types.Hash
+}
+
+type EventEscrowFundsLocked struct {
+    Phase     types.Phase
+    EscrowID  [32]byte
+    Payer     types.AccountID
+    Payee     types.AccountID
+    Amount    types.U128
+    Topics    []types.Hash
+}
+
+type EventEscrowFundsReleased struct {
+    Phase     types.Phase
+    EscrowID  [32]byte
+    Payer     types.AccountID
+    Payee     types.AccountID
+    Amount    types.U128
+    Topics    []types.Hash
+}
+
+type EventEscrowFundsRefunded struct {
+    Phase     types.Phase
+    EscrowID  [32]byte
+    Payer     types.AccountID
+    Amount    types.U128
+    Topics    []types.Hash
+}
+
 type EventRecords struct {
     types.EventRecords
-    AgentRegistry_AgentRegistered []EventAgentRegistryAgentRegistered
-    VectorDb_CommitmentRegistered []EventVectorDbCommitmentRegistered
+    AgentRegistry_AgentRegistered     []EventAgentRegistryAgentRegistered
+    VectorDb_CommitmentRegistered     []EventVectorDbCommitmentRegistered
+    VectorDb_CommitmentAcknowledged   []EventVectorDbCommitmentAcknowledged
+    VectorDb_CommitmentSettled        []EventVectorDbCommitmentSettled
+    VectorDb_DisputeRaised            []EventVectorDbDisputeRaised
+    VectorDb_DisputeCountered         []EventVectorDbDisputeCountered
+    VectorDb_DisputeFinalized         []EventVectorDbDisputeFinalized
+    VectorDb_CommitmentExpired        []EventVectorDbCommitmentExpired
+    Escrow_FundsLocked                []EventEscrowFundsLocked
+    Escrow_FundsReleased              []EventEscrowFundsReleased
+    Escrow_FundsRefunded              []EventEscrowFundsRefunded
 }
 
 func Run(ctx context.Context, ws, dsn string) error {
@@ -46,21 +128,17 @@ func Run(ctx context.Context, ws, dsn string) error {
         db = s
         defer db.Close()
         log.Printf("postgres connected")
-    } else {
-        log.Printf("DATABASE_URL empty — log only")
     }
 
     api, err := gsrpc.NewSubstrateAPI(ws)
     if err != nil {
         return fmt.Errorf("connect %s: %w", ws, err)
     }
-
     sub, err := api.RPC.Chain.SubscribeNewHeads()
     if err != nil {
         return fmt.Errorf("subscribe heads: %w", err)
     }
     defer sub.Unsubscribe()
-
     log.Printf("listening on %s", ws)
 
     for {
@@ -72,6 +150,15 @@ func Run(ctx context.Context, ws, dsn string) error {
                 log.Printf("block #%d: %v", head.Number, err)
             }
         }
+    }
+}
+
+func setStatus(ctx context.Context, db *store.Store, id [32]byte, status string) {
+    if db == nil {
+        return
+    }
+    if err := db.SetCommitmentStatus(ctx, id[:], status); err != nil {
+        log.Printf("status %s id=%s: %v", status, hex.EncodeToString(id[:]), err)
     }
 }
 
@@ -100,29 +187,50 @@ func handleHead(ctx context.Context, api *gsrpc.SubstrateAPI, db *store.Store, h
     }
 
     for _, e := range events.AgentRegistry_AgentRegistered {
-        log.Printf("AGENT registered block=#%d did=%s controller=%s",
-            head.Number, hex.EncodeToString(e.Did[:]), hex.EncodeToString(e.Controller[:]))
+        log.Printf("AGENT registered block=#%d did=%s", head.Number, hex.EncodeToString(e.Did[:]))
         if db != nil {
-            if err := db.UpsertAgent(ctx, e.Did[:], e.Controller[:], uint64(head.Number)); err != nil {
-                log.Printf("db write did=%s: %v", hex.EncodeToString(e.Did[:]), err)
-            }
+            _ = db.UpsertAgent(ctx, e.Did[:], e.Controller[:], uint64(head.Number))
         }
     }
     for _, e := range events.VectorDb_CommitmentRegistered {
-        log.Printf("COMMITMENT registered block=#%d id=%s chunks=%d",
-            head.Number, hex.EncodeToString(e.CommitmentID[:]), e.TotalChunks)
+        log.Printf("COMMITMENT registered block=#%d id=%s", head.Number, hex.EncodeToString(e.CommitmentID[:]))
         if db != nil {
-            if err := db.UpsertCommitment(ctx,
-                e.CommitmentID[:], e.Provider[:], e.Consumer[:], e.MerkleRoot[:],
-                uint64(e.TotalChunks), uint64(e.ExpiresAt), uint64(head.Number),
-            ); err != nil {
-                log.Printf("db write commitment=%s: %v", hex.EncodeToString(e.CommitmentID[:]), err)
-            }
+            _ = db.UpsertCommitment(ctx, e.CommitmentID[:], e.Provider[:], e.Consumer[:], e.MerkleRoot[:],
+                uint64(e.TotalChunks), uint64(e.ExpiresAt), uint64(head.Number))
         }
     }
-    if len(events.AgentRegistry_AgentRegistered) == 0 &&
-        len(events.VectorDb_CommitmentRegistered) == 0 {
-        log.Printf("block #%d ok (no market events, %d bytes)", head.Number, len(*raw))
+    for _, e := range events.VectorDb_CommitmentAcknowledged {
+        log.Printf("COMMITMENT acknowledged id=%s", hex.EncodeToString(e.CommitmentID[:]))
+        setStatus(ctx, db, e.CommitmentID, "acknowledged")
+    }
+    for _, e := range events.VectorDb_CommitmentSettled {
+        log.Printf("COMMITMENT settled id=%s", hex.EncodeToString(e.CommitmentID[:]))
+        setStatus(ctx, db, e.CommitmentID, "settled")
+    }
+    for _, e := range events.VectorDb_DisputeRaised {
+        log.Printf("DISPUTE raised id=%s", hex.EncodeToString(e.CommitmentID[:]))
+        setStatus(ctx, db, e.CommitmentID, "disputed")
+    }
+    for _, e := range events.VectorDb_DisputeCountered {
+        log.Printf("DISPUTE countered id=%s", hex.EncodeToString(e.CommitmentID[:]))
+        setStatus(ctx, db, e.CommitmentID, "disputed")
+    }
+    for _, e := range events.VectorDb_DisputeFinalized {
+        log.Printf("DISPUTE finalized id=%s", hex.EncodeToString(e.CommitmentID[:]))
+        setStatus(ctx, db, e.CommitmentID, "finalized")
+    }
+    for _, e := range events.VectorDb_CommitmentExpired {
+        log.Printf("COMMITMENT expired id=%s", hex.EncodeToString(e.CommitmentID[:]))
+        setStatus(ctx, db, e.CommitmentID, "expired")
+    }
+    for _, e := range events.Escrow_FundsLocked {
+        log.Printf("ESCROW locked id=%s", hex.EncodeToString(e.EscrowID[:]))
+    }
+    for _, e := range events.Escrow_FundsReleased {
+        log.Printf("ESCROW released id=%s", hex.EncodeToString(e.EscrowID[:]))
+    }
+    for _, e := range events.Escrow_FundsRefunded {
+        log.Printf("ESCROW refunded id=%s", hex.EncodeToString(e.EscrowID[:]))
     }
     return nil
 }
