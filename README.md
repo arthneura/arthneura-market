@@ -13,16 +13,18 @@ Postgres:
 
     docker start arthneura-pg
 
-Indexer:
+Indexer (writes chain events and commitment status to Postgres):
 
     go run ./cmd/indexer
 
-Discovery API:
+Discovery API (reads Postgres):
 
     go run ./cmd/api
     curl -s http://127.0.0.1:8080/health
     curl -s http://127.0.0.1:8080/v1/agents
     curl -s http://127.0.0.1:8080/v1/commitments
+
+Commitment JSON includes status: registered, acknowledged, settled, disputed, finalized, expired.
 
 First boot of Postgres (only once):
 
@@ -34,3 +36,4 @@ First boot of Postgres (only once):
       postgres:16
     docker exec -i arthneura-pg psql -U arthneura -d arthneura_market < db/migrations/001_init.sql
     docker exec -i arthneura-pg psql -U arthneura -d arthneura_market < db/migrations/002_commitments_fields.sql
+    docker exec -i arthneura-pg psql -U arthneura -d arthneura_market < db/migrations/003_commitment_status.sql
