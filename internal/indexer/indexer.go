@@ -109,8 +109,16 @@ func handleHead(ctx context.Context, api *gsrpc.SubstrateAPI, db *store.Store, h
         }
     }
     for _, e := range events.VectorDb_CommitmentRegistered {
-        log.Printf("COMMITMENT registered block=#%d id=%s",
-            head.Number, hex.EncodeToString(e.CommitmentID[:]))
+        log.Printf("COMMITMENT registered block=#%d id=%s chunks=%d",
+            head.Number, hex.EncodeToString(e.CommitmentID[:]), e.TotalChunks)
+        if db != nil {
+            if err := db.UpsertCommitment(ctx,
+                e.CommitmentID[:], e.Provider[:], e.Consumer[:], e.MerkleRoot[:],
+                uint64(e.TotalChunks), uint64(e.ExpiresAt), uint64(head.Number),
+            ); err != nil {
+                log.Printf("db write commitment=%s: %v", hex.EncodeToString(e.CommitmentID[:]), err)
+            }
+        }
     }
     if len(events.AgentRegistry_AgentRegistered) == 0 &&
         len(events.VectorDb_CommitmentRegistered) == 0 {
