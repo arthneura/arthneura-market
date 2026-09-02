@@ -27,6 +27,7 @@ type Commitment struct {
     TotalChunks  int64  `json:"total_chunks"`
     ExpiresAt    int64  `json:"expires_at"`
     Block        int64  `json:"block"`
+    Status       string `json:"status"`
 }
 
 func Open(ctx context.Context, dsn string) (*Store, error) {
@@ -97,8 +98,8 @@ func (s *Store) UpsertCommitment(ctx context.Context, id, provider, consumer, ro
     _, err := s.pool.Exec(ctx, `
         INSERT INTO commitments (
             commitment_id, provider, consumer, merkle_root,
-            total_chunks, expires_at, block, raw_event
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7, jsonb_build_object('block', $7::bigint))
+            total_chunks, expires_at, block, status, raw_event
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,'registered', jsonb_build_object('block', $7::bigint))
         ON CONFLICT (commitment_id) DO UPDATE SET
             provider = EXCLUDED.provider,
             consumer = EXCLUDED.consumer,
@@ -112,10 +113,19 @@ func (s *Store) UpsertCommitment(ctx context.Context, id, provider, consumer, ro
     return err
 }
 
+func (s *Store) SetCommitmentStatus(ctx context.Context, id []byte, status string) error {
+    _, err := s.pool.Exec(ctx, `
+        UPDATE commitments SET status = $2, updated_at = now()
+        WHERE commitment_id = $1
+    `, id, status)
+    return err
+}
+
 func (s *Store) ListCommitments(ctx context.Context) ([]Commitment, error) {
     rows, err := s.pool.Query(ctx, `
         SELECT commitment_id, provider, consumer, merkle_root,
-               COALESCE(total_chunks,0), COALESCE(expires_at,0), COALESCE(block,0)
+               COALESCE(total_chunks,0), COALESCE(expires_at,0), COALESCE(block,0),
+               COALESCE(status, 'registered')
         FROM commitments
         ORDER BY updated_at DESC
     `)
@@ -141,7 +151,8 @@ func (s *Store) GetCommitment(ctx context.Context, idHex string) (Commitment, er
     }
     row := s.pool.QueryRow(ctx, `
         SELECT commitment_id, provider, consumer, merkle_root,
-               COALESCE(total_chunks,0), COALESCE(expires_at,0), COALESCE(block,0)
+               COALESCE(total_chunks,0), COALESCE(expires_at,0), COALESCE(block,0),
+               COALESCE(status, 'registered')
         FROM commitments
         WHERE commitment_id = $1
     `, raw)
@@ -169,7 +180,8 @@ func scanAgent(row scanner) (Agent, error) {
 func scanCommitment(row scanner) (Commitment, error) {
     var id, provider, consumer, root []byte
     var chunks, expires, block int64
-    if err := row.Scan(&id, &provider, &consumer, &root, &chunks, &expires, &block); err != nil {
+    var status string
+    if err := row.Scan(&id, &provider, &consumer, &root, &chunks, &expires, &block, &status); err != nil {
         if err == pgx.ErrNoRows {
             return Commitment{}, err
         }
@@ -183,5 +195,6 @@ func scanCommitment(row scanner) (Commitment, error) {
         TotalChunks:  chunks,
         ExpiresAt:    expires,
         Block:        block,
+        Status:       status,
     }, nil
 }
