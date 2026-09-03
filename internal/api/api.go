@@ -1,6 +1,7 @@
 package api
 
 import (
+    "encoding/hex"
     "encoding/json"
     "errors"
     "net/http"
@@ -60,6 +61,31 @@ func NewMux(db *store.Store) *http.ServeMux {
         }
         if err != nil {
             writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+            return
+        }
+        writeJSON(w, http.StatusOK, item)
+    })
+    mux.HandleFunc("POST /v1/commitments/{id}/deliver", func(w http.ResponseWriter, r *http.Request) {
+        idHex := strings.TrimSpace(r.PathValue("id"))
+        id, err := hex.DecodeString(idHex)
+        if err != nil || len(id) != 32 {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad commitment id"})
+            return
+        }
+        var body struct {
+            URL string `json:"url"`
+        }
+        if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.URL) == "" {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": "url required"})
+            return
+        }
+        if err := db.SetDeliverURL(r.Context(), id, strings.TrimSpace(body.URL)); err != nil {
+            writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+            return
+        }
+        item, err := db.GetCommitment(r.Context(), idHex)
+        if err != nil {
+            writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
             return
         }
         writeJSON(w, http.StatusOK, item)

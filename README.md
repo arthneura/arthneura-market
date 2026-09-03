@@ -48,3 +48,9 @@ Go hasher matches arthneura-core (`blake2b-256`, left||right).
 
     go run ./cmd/provider
     go run ./cmd/pull
+
+## Announce a delivery URL
+
+    curl -s -X POST http://127.0.0.1:8080/v1/commitments/COMMITMENT_ID/deliver \
+      -H 'Content-Type: application/json' \
+      -d '{"url":"http://127.0.0.1:8090"}'
