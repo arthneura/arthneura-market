@@ -9,6 +9,7 @@ import (
 
     "github.com/jackc/pgx/v5"
 
+    "github.com/arthneura/arthneura-market/internal/announce"
     "github.com/arthneura/arthneura-market/internal/store"
 )
 
@@ -73,10 +74,45 @@ func NewMux(db *store.Store) *http.ServeMux {
             return
         }
         var body struct {
-            URL string `json:"url"`
+            URL       string `json:"url"`
+            ExpiresAt int64  `json:"expires_at"`
+            Signature string `json:"signature"`
         }
         if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.URL) == "" {
             writeJSON(w, http.StatusBadRequest, map[string]string{"error": "url required"})
+            return
+        }
+        item0, err := db.GetCommitment(r.Context(), idHex)
+        if errors.Is(err, pgx.ErrNoRows) {
+            writeJSON(w, http.StatusNotFound, map[string]string{"error": "commitment not found"})
+            return
+        }
+        if err != nil {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+            return
+        }
+        agent, err := db.GetAgent(r.Context(), item0.Provider)
+        if err != nil {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": "provider agent not indexed"})
+            return
+        }
+        ctrl, err := hex.DecodeString(agent.Controller)
+        if err != nil || len(ctrl) != 32 {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad controller"})
+            return
+        }
+        sigb, err := hex.DecodeString(strings.TrimSpace(body.Signature))
+        if err != nil || len(sigb) != 64 {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": "signature must be 64-byte hex"})
+            return
+        }
+        var pub [32]byte
+        var sig [64]byte
+        copy(pub[:], ctrl)
+        copy(sig[:], sigb)
+        msg := announce.Message(idHex, strings.TrimSpace(body.URL), body.ExpiresAt)
+        if err := announce.Verify(pub, sig, msg, body.ExpiresAt); err != nil {
+            writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
             return
         }
         if err := db.SetDeliverURL(r.Context(), id, strings.TrimSpace(body.URL)); err != nil {
