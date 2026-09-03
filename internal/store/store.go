@@ -28,6 +28,7 @@ type Commitment struct {
     ExpiresAt    int64  `json:"expires_at"`
     Block        int64  `json:"block"`
     Status       string `json:"status"`
+    DeliverURL   string `json:"deliver_url,omitempty"`
 }
 
 func Open(ctx context.Context, dsn string) (*Store, error) {
@@ -121,11 +122,19 @@ func (s *Store) SetCommitmentStatus(ctx context.Context, id []byte, status strin
     return err
 }
 
+func (s *Store) SetDeliverURL(ctx context.Context, id []byte, url string) error {
+    _, err := s.pool.Exec(ctx, `
+        UPDATE commitments SET deliver_url = $2, updated_at = now()
+        WHERE commitment_id = $1
+    `, id, url)
+    return err
+}
+
 func (s *Store) ListCommitments(ctx context.Context) ([]Commitment, error) {
     rows, err := s.pool.Query(ctx, `
         SELECT commitment_id, provider, consumer, merkle_root,
                COALESCE(total_chunks,0), COALESCE(expires_at,0), COALESCE(block,0),
-               COALESCE(status, 'registered')
+               COALESCE(status, 'registered'), COALESCE(deliver_url, '')
         FROM commitments
         ORDER BY updated_at DESC
     `)
@@ -152,7 +161,7 @@ func (s *Store) GetCommitment(ctx context.Context, idHex string) (Commitment, er
     row := s.pool.QueryRow(ctx, `
         SELECT commitment_id, provider, consumer, merkle_root,
                COALESCE(total_chunks,0), COALESCE(expires_at,0), COALESCE(block,0),
-               COALESCE(status, 'registered')
+               COALESCE(status, 'registered'), COALESCE(deliver_url, '')
         FROM commitments
         WHERE commitment_id = $1
     `, raw)
@@ -180,8 +189,8 @@ func scanAgent(row scanner) (Agent, error) {
 func scanCommitment(row scanner) (Commitment, error) {
     var id, provider, consumer, root []byte
     var chunks, expires, block int64
-    var status string
-    if err := row.Scan(&id, &provider, &consumer, &root, &chunks, &expires, &block, &status); err != nil {
+    var status, deliver string
+    if err := row.Scan(&id, &provider, &consumer, &root, &chunks, &expires, &block, &status, &deliver); err != nil {
         if err == pgx.ErrNoRows {
             return Commitment{}, err
         }
@@ -196,5 +205,6 @@ func scanCommitment(row scanner) (Commitment, error) {
         ExpiresAt:    expires,
         Block:        block,
         Status:       status,
+        DeliverURL:   deliver,
     }, nil
 }
