@@ -50,17 +50,34 @@ func Proof(chunks [][]byte, index int) [][32]byte {
     return proof
 }
 
-func Verify(chunk []byte, index int, proof [][32]byte, root [32]byte) bool {
+func Verify(chunk []byte, index, total int, proof [][32]byte, root [32]byte) bool {
+    if total <= 0 || index < 0 || index >= total {
+        return false
+    }
     h := HashBytes(chunk)
     idx := index
-    for _, sib := range proof {
-        s := sib
+    pi := 0
+    size := total
+    for size > 1 {
         if idx%2 == 0 {
-            h = HashPair(h, &s)
+            if idx+1 < size {
+                if pi >= len(proof) {
+                    return false
+                }
+                s := proof[pi]
+                pi++
+                h = HashPair(h, &s)
+            }
         } else {
+            if pi >= len(proof) {
+                return false
+            }
+            s := proof[pi]
+            pi++
             h = HashPair(s, &h)
         }
         idx /= 2
+        size = (size + 1) / 2
     }
-    return h == root
+    return h == root && pi == len(proof)
 }

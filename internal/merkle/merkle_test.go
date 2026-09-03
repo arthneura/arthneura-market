@@ -77,10 +77,10 @@ func TestProofVerify(t *testing.T) {
     root := Root(chunks)
     for i, c := range chunks {
         p := Proof(chunks, i)
-        if !Verify(c, i, p, root) {
+        if !Verify(c, i, len(chunks), p, root) {
             t.Fatalf("verify failed index %d", i)
         }
-        if Verify([]byte("nope"), i, p, root) {
+        if Verify([]byte("nope"), i, len(chunks), p, root) {
             t.Fatalf("bad chunk verified index %d", i)
         }
     }
