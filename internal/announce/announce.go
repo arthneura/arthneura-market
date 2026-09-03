@@ -14,22 +14,29 @@ func Message(commitmentIDHex, url string, expiresAt int64) []byte {
 }
 
 func Sign(seed [32]byte, msg []byte) ([64]byte, [32]byte, error) {
+    var out [64]byte
+    var pubOut [32]byte
     msk, err := sr25519.NewMiniSecretKeyFromRaw(seed)
     if err != nil {
-        return [64]byte{}, [32]byte{}, err
+        return out, pubOut, err
     }
     kp := msk.ExpandEd25519()
     t := sr25519.NewSigningContext([]byte("substrate"), msg)
     sig, err := kp.Sign(t)
     if err != nil {
-        return [64]byte{}, [32]byte{}, err
+        return out, pubOut, err
     }
-    var out [64]byte
-    copy(out[:], sig.Encode()[:])
-    return out, kp.Public().Encode(), nil
+    enc := sig.Encode()
+    copy(out[:], enc[:])
+    pub, err := kp.Public()
+    if err != nil {
+        return out, pubOut, err
+    }
+    pubOut = pub.Encode()
+    return out, pubOut, nil
 }
 
-func Verify(controllerPub [32]byte, sig [64]byte, msg []byte, expiresAt int64) error {
+func Verify(controllerPub [32]byte, sigBytes [64]byte, msg []byte, expiresAt int64) error {
     if expiresAt < time.Now().Unix() {
         return fmt.Errorf("announce expired")
     }
@@ -38,11 +45,15 @@ func Verify(controllerPub [32]byte, sig [64]byte, msg []byte, expiresAt int64) e
         return err
     }
     var s sr25519.Signature
-    if err := s.Decode(sig); err != nil {
+    if err := s.Decode(sigBytes); err != nil {
         return fmt.Errorf("bad signature")
     }
     t := sr25519.NewSigningContext([]byte("substrate"), msg)
-    if !pub.Verify(&s, t) {
+    ok, err := pub.Verify(&s, t)
+    if err != nil {
+        return err
+    }
+    if !ok {
         return fmt.Errorf("bad signature")
     }
     return nil
