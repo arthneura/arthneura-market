@@ -43,3 +43,8 @@ First boot of Postgres (only once):
 Go hasher matches arthneura-core (`blake2b-256`, left||right).
 
     go test ./internal/merkle
+
+## Local chunk pull (demo)
+
+    go run ./cmd/provider
+    go run ./cmd/pull
