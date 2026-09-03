@@ -37,3 +37,9 @@ First boot of Postgres (only once):
     docker exec -i arthneura-pg psql -U arthneura -d arthneura_market < db/migrations/001_init.sql
     docker exec -i arthneura-pg psql -U arthneura -d arthneura_market < db/migrations/002_commitments_fields.sql
     docker exec -i arthneura-pg psql -U arthneura -d arthneura_market < db/migrations/003_commitment_status.sql
+
+## Merkle
+
+Go hasher matches arthneura-core (`blake2b-256`, left||right).
+
+    go test ./internal/merkle
