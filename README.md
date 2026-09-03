@@ -60,3 +60,10 @@ Go hasher matches arthneura-core (`blake2b-256`, left||right).
     go run ./cmd/api
     go run ./cmd/provider
     go run ./cmd/pull -id COMMITMENT_ID
+
+## Signed deliver announce
+
+POST /v1/commitments/{id}/deliver now needs url, expires_at, and an sr25519
+signature by the provider agent's controller.
+
+    ANNOUNCE_SEED=... go run ./cmd/announce -id COMMITMENT_ID
