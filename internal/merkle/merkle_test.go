@@ -55,3 +55,33 @@ func TestHashPairOddIsLeft(t *testing.T) {
 func TestMust32Helper(t *testing.T) {
     _ = must32(t, "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8")
 }
+
+func TestRootTwoLeaves(t *testing.T) {
+    root := Root([][]byte{[]byte("hello"), []byte("world")})
+    want := "37d9b9204f631c0e327932eaecbfcc1587f13a40866059169e1a1a050593181a"
+    if hex.EncodeToString(root[:]) != want {
+        t.Fatalf("root=%x want %s", root, want)
+    }
+}
+
+func TestRootThreeLeaves(t *testing.T) {
+    root := Root([][]byte{[]byte("a"), []byte("b"), []byte("c")})
+    want := "350bf288b7179755b0d6f6e91f8e6fa5b2ac2d8bcf6d0b3882b81a2d3171bc8c"
+    if hex.EncodeToString(root[:]) != want {
+        t.Fatalf("root3=%x want %s", root, want)
+    }
+}
+
+func TestProofVerify(t *testing.T) {
+    chunks := [][]byte{[]byte("hello"), []byte("world"), []byte("arth")}
+    root := Root(chunks)
+    for i, c := range chunks {
+        p := Proof(chunks, i)
+        if !Verify(c, i, p, root) {
+            t.Fatalf("verify failed index %d", i)
+        }
+        if Verify([]byte("nope"), i, p, root) {
+            t.Fatalf("bad chunk verified index %d", i)
+        }
+    }
+}
