@@ -81,31 +81,31 @@ func (s *Store) ListOffers(ctx context.Context) ([]Offer, error) {
     var out []Offer
     for rows.Next() {
         var id, listingID, price, chunks, blocks int64
-        var from, to, root []byte
+        var from, to, root, cid []byte
         var exp time.Time
         var status string
-        if err := rows.Scan(&id, &listingID, &from, &to, &price, &exp, &status, &root, &chunks, &blocks); err != nil {
+        if err := rows.Scan(&id, &listingID, &from, &to, &price, &exp, &status, &root, &chunks, &blocks, &cid); err != nil {
             return nil, err
         }
-        out = append(out, scanOffer(id, listingID, price, chunks, blocks, from, to, root, exp, status))
+        out = append(out, scanOffer(id, listingID, price, chunks, blocks, from, to, root, cid, exp, status))
     }
     return out, rows.Err()
 }
 
 func (s *Store) GetOffer(ctx context.Context, id int64) (Offer, error) {
     var listingID, price, chunks, blocks int64
-    var from, to, root []byte
+    var from, to, root, cid []byte
     var exp time.Time
     var status string
     err := s.pool.QueryRow(ctx, `
         SELECT id, listing_id, from_did, to_did, price, expires_at, status,
                merkle_root, COALESCE(total_chunks,0), COALESCE(expires_in_blocks,0)
         FROM offers WHERE id = $1
-    `, id).Scan(&id, &listingID, &from, &to, &price, &exp, &status, &root, &chunks, &blocks)
+    `, id).Scan(&id, &listingID, &from, &to, &price, &exp, &status, &root, &chunks, &blocks, &cid)
     if err != nil {
         return Offer{}, err
     }
-    return scanOffer(id, listingID, price, chunks, blocks, from, to, root, exp, status), nil
+    return scanOffer(id, listingID, price, chunks, blocks, from, to, root, cid, exp, status), nil
 }
 
 func (s *Store) CounterOffer(ctx context.Context, oldID int64, price int64, exp time.Time) (Offer, error) {
