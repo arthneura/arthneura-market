@@ -72,3 +72,10 @@ signature by the provider agent's controller.
 
 GET /v1/agents includes capabilities, status, label.
 Status updates from AgentStatusChanged.
+
+## Listings
+
+    curl -s http://127.0.0.1:8080/v1/listings
+    curl -s -X POST http://127.0.0.1:8080/v1/listings \
+      -H 'Content-Type: application/json' \
+      -d '{"seller_did":"DID_HEX","title":"street photos v1","price":80}'
