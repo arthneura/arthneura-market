@@ -154,4 +154,47 @@ func mountOffers(mux *http.ServeMux, db *store.Store) {
         }
         writeJSON(w, http.StatusOK, item)
     })
+
+    mux.HandleFunc("GET /v1/offers/{id}/stamp", func(w http.ResponseWriter, r *http.Request) {
+        id, err := strconv.ParseInt(strings.TrimSpace(r.PathValue("id")), 10, 64)
+        if err != nil {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad id"})
+            return
+        }
+        off, err := db.GetOffer(r.Context(), id)
+        if err != nil {
+            writeJSON(w, http.StatusNotFound, map[string]string{"error": "offer not found"})
+            return
+        }
+        if off.Status != "accepted" {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": "offer not accepted"})
+            return
+        }
+        if off.MerkleRoot == "" || off.TotalChunks <= 0 || off.ExpiresInBlocks <= 0 {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": "delivery spec missing"})
+            return
+        }
+        listing, err := db.GetListing(r.Context(), off.ListingID)
+        if err != nil {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": "listing not found"})
+            return
+        }
+        provider := listing.SellerDid
+        consumer := off.ToDid
+        if off.FromDid != provider {
+            consumer = off.FromDid
+        } else {
+            consumer = off.ToDid
+        }
+        writeJSON(w, http.StatusOK, map[string]any{
+            "offer_id":           off.ID,
+            "provider_did":       provider,
+            "consumer_did":       consumer,
+            "merkle_root":        off.MerkleRoot,
+            "total_chunks":       off.TotalChunks,
+            "expires_in_blocks":  off.ExpiresInBlocks,
+            "price":              off.Price,
+            "ready":              true,
+        })
+    })
 }
