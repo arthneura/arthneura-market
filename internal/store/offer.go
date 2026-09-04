@@ -70,7 +70,8 @@ func (s *Store) ListOffers(ctx context.Context) ([]Offer, error) {
     `)
     rows, err := s.pool.Query(ctx, `
         SELECT id, listing_id, from_did, to_did, price, expires_at, status,
-               merkle_root, COALESCE(total_chunks,0), COALESCE(expires_in_blocks,0)
+               merkle_root, COALESCE(total_chunks,0), COALESCE(expires_in_blocks,0),
+               commitment_id
         FROM offers
         ORDER BY id DESC
     `)
@@ -99,7 +100,8 @@ func (s *Store) GetOffer(ctx context.Context, id int64) (Offer, error) {
     var status string
     err := s.pool.QueryRow(ctx, `
         SELECT id, listing_id, from_did, to_did, price, expires_at, status,
-               merkle_root, COALESCE(total_chunks,0), COALESCE(expires_in_blocks,0)
+               merkle_root, COALESCE(total_chunks,0), COALESCE(expires_in_blocks,0),
+               commitment_id
         FROM offers WHERE id = $1
     `, id).Scan(&id, &listingID, &from, &to, &price, &exp, &status, &root, &chunks, &blocks, &cid)
     if err != nil {
