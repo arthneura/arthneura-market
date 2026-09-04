@@ -18,6 +18,7 @@ type Offer struct {
     MerkleRoot      string `json:"merkle_root,omitempty"`
     TotalChunks     int64  `json:"total_chunks,omitempty"`
     ExpiresInBlocks int64  `json:"expires_in_blocks,omitempty"`
+	CommitmentID    string `json:"commitment_id,omitempty"`
 }
 
 func (s *Store) CreateOffer(ctx context.Context, listingID int64, from, to []byte, price int64, exp time.Time) (Offer, error) {
@@ -179,4 +180,22 @@ func (s *Store) SetOfferSpec(ctx context.Context, id int64, root []byte, chunks,
         WHERE id = $1 AND status IN ('open','accepted')
     `, id, root, chunks, blocks)
     return err
+}
+
+
+func (s *Store) SetOfferCommitment(ctx context.Context, offerID int64, commitmentID []byte) error {
+    if len(commitmentID) != 32 {
+        return fmt.Errorf("commitment id must be 32 bytes")
+    }
+    tag, err := s.pool.Exec(ctx, `
+        UPDATE offers SET commitment_id = $2
+        WHERE id = $1 AND status = 'accepted'
+    `, offerID, commitmentID)
+    if err != nil {
+        return err
+    }
+    if tag.RowsAffected() == 0 {
+        return fmt.Errorf("offer not accepted or missing")
+    }
+    return nil
 }
