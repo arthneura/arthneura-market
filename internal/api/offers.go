@@ -197,4 +197,34 @@ func mountOffers(mux *http.ServeMux, db *store.Store) {
             "ready":              true,
         })
     })
+
+    mux.HandleFunc("POST /v1/offers/{id}/commitment", func(w http.ResponseWriter, r *http.Request) {
+        id, err := strconv.ParseInt(strings.TrimSpace(r.PathValue("id")), 10, 64)
+        if err != nil {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad id"})
+            return
+        }
+        var body struct {
+            CommitmentID string `json:"commitment_id"`
+        }
+        if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad json"})
+            return
+        }
+        cid, err := hex.DecodeString(strings.TrimSpace(body.CommitmentID))
+        if err != nil || len(cid) != 32 {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": "commitment_id must be 32-byte hex"})
+            return
+        }
+        if err := db.SetOfferCommitment(r.Context(), id, cid); err != nil {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+            return
+        }
+        item, err := db.GetOffer(r.Context(), id)
+        if err != nil {
+            writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+            return
+        }
+        writeJSON(w, http.StatusOK, item)
+    })
 }
