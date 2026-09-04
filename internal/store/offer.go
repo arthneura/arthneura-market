@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
     "context"
     "encoding/hex"
     "time"
@@ -79,4 +80,46 @@ func (s *Store) ListOffers(ctx context.Context) ([]Offer, error) {
         })
     }
     return out, rows.Err()
+}
+
+func (s *Store) GetOffer(ctx context.Context, id int64) (Offer, error) {
+    var listingID, price int64
+    var from, to []byte
+    var exp time.Time
+    var status string
+    err := s.pool.QueryRow(ctx, `
+        SELECT id, listing_id, from_did, to_did, price, expires_at, status
+        FROM offers WHERE id = $1
+    `, id).Scan(&id, &listingID, &from, &to, &price, &exp, &status)
+    if err != nil {
+        return Offer{}, err
+    }
+    return Offer{
+        ID: id, ListingID: listingID,
+        FromDid: hex.EncodeToString(from), ToDid: hex.EncodeToString(to),
+        Price: price, ExpiresAt: exp.UTC().Format(time.RFC3339), Status: status,
+    }, nil
+}
+
+func (s *Store) CounterOffer(ctx context.Context, oldID int64, price int64, exp time.Time) (Offer, error) {
+    old, err := s.GetOffer(ctx, oldID)
+    if err != nil {
+        return Offer{}, err
+    }
+    if old.Status != "open" {
+        return Offer{}, fmt.Errorf("offer not open")
+    }
+    _, err = s.pool.Exec(ctx, `UPDATE offers SET status = 'countered' WHERE id = $1 AND status = 'open'`, oldID)
+    if err != nil {
+        return Offer{}, err
+    }
+    from, err := DecodeDid(old.ToDid)
+    if err != nil {
+        return Offer{}, err
+    }
+    to, err := DecodeDid(old.FromDid)
+    if err != nil {
+        return Offer{}, err
+    }
+    return s.CreateOffer(ctx, old.ListingID, from, to, price, exp)
 }

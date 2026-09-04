@@ -70,4 +70,29 @@ func mountOffers(mux *http.ServeMux, db *store.Store) {
         }
         writeJSON(w, http.StatusOK, map[string]any{"id": id, "status": "cancelled"})
     })
+
+    mux.HandleFunc("POST /v1/offers/{id}/counter", func(w http.ResponseWriter, r *http.Request) {
+        id, err := strconv.ParseInt(strings.TrimSpace(r.PathValue("id")), 10, 64)
+        if err != nil {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad id"})
+            return
+        }
+        var body struct {
+            Price     int64 `json:"price"`
+            ExpiresIn int64 `json:"expires_in_sec"`
+        }
+        if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Price < 0 {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": "price required"})
+            return
+        }
+        if body.ExpiresIn <= 0 {
+            body.ExpiresIn = 1800
+        }
+        item, err := db.CounterOffer(r.Context(), id, body.Price, time.Now().Add(time.Duration(body.ExpiresIn)*time.Second))
+        if err != nil {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+            return
+        }
+        writeJSON(w, http.StatusOK, item)
+    })
 }
