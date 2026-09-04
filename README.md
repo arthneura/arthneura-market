@@ -67,3 +67,8 @@ POST /v1/commitments/{id}/deliver now needs url, expires_at, and an sr25519
 signature by the provider agent's controller.
 
     ANNOUNCE_SEED=... go run ./cmd/announce -id COMMITMENT_ID
+
+## Agent profile fields
+
+GET /v1/agents includes capabilities, status, label.
+Status updates from AgentStatusChanged.

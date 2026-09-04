@@ -111,9 +111,18 @@ type EventAgentRegistryReputationSlashed struct {
     Topics    []types.Hash
 }
 
+
+type EventAgentRegistryAgentStatusChanged struct {
+    Phase     types.Phase
+    Did       [32]byte
+    NewStatus byte
+    Topics    []types.Hash
+}
+
 type EventRecords struct {
     types.EventRecords
     AgentRegistry_AgentRegistered     []EventAgentRegistryAgentRegistered
+	AgentRegistry_AgentStatusChanged  []EventAgentRegistryAgentStatusChanged
     AgentRegistry_ReputationSlashed   []EventAgentRegistryReputationSlashed
     VectorDb_CommitmentRegistered     []EventVectorDbCommitmentRegistered
     VectorDb_CommitmentAcknowledged   []EventVectorDbCommitmentAcknowledged
@@ -193,6 +202,23 @@ func handleHead(ctx context.Context, api *gsrpc.SubstrateAPI, db *store.Store, h
     if err := types.EventRecordsRaw(*raw).DecodeEventRecords(meta, &events); err != nil {
         log.Printf("block #%d events_bytes=%d decode=%v", head.Number, len(*raw), err)
         return nil
+    }
+
+    
+    for _, e := range events.AgentRegistry_AgentStatusChanged {
+        st := "active"
+        switch e.NewStatus {
+        case 1:
+            st = "suspended"
+        case 2:
+            st = "revoked"
+        }
+        log.Printf("AGENT status did=%s status=%s", hex.EncodeToString(e.Did[:]), st)
+        if db != nil {
+            if err := db.SetAgentStatus(ctx, e.Did[:], st); err != nil {
+                log.Printf("db status: %v", err)
+            }
+        }
     }
 
     for _, e := range events.AgentRegistry_AgentRegistered {
