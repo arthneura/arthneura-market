@@ -205,3 +205,31 @@ func (s *Store) SetOfferCommitment(ctx context.Context, offerID int64, commitmen
     }
     return nil
 }
+
+
+func (s *Store) LinkOfferByParties(ctx context.Context, provider, consumer, commitmentID []byte) error {
+    if len(commitmentID) != 32 {
+        return fmt.Errorf("commitment id must be 32 bytes")
+    }
+    tag, err := s.pool.Exec(ctx, `
+        UPDATE offers SET commitment_id = $3
+        WHERE id = (
+            SELECT id FROM offers
+            WHERE status = 'accepted'
+              AND commitment_id IS NULL
+              AND (
+                    (from_did = $1 AND to_did = $2)
+                 OR (from_did = $2 AND to_did = $1)
+              )
+            ORDER BY id DESC
+            LIMIT 1
+        )
+    `, provider, consumer, commitmentID)
+    if err != nil {
+        return err
+    }
+    if tag.RowsAffected() == 0 {
+        return fmt.Errorf("no accepted offer for these parties")
+    }
+    return nil
+}
