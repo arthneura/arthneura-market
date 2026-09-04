@@ -104,3 +104,5 @@ Ready JSON is the register_commitment argument list. Market does not submit the 
     curl -s -X POST http://127.0.0.1:8080/v1/offers/ID/commitment \
       -H 'Content-Type: application/json' \
       -d '{"commitment_id":"COMMITMENT_HEX"}'
+
+Indexer auto-links an accepted offer to a new commitment when provider and consumer DIDs match.
