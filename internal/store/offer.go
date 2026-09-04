@@ -1,20 +1,23 @@
 package store
 
 import (
-	"fmt"
     "context"
     "encoding/hex"
+    "fmt"
     "time"
 )
 
 type Offer struct {
-    ID        int64  `json:"id"`
-    ListingID int64  `json:"listing_id"`
-    FromDid   string `json:"from_did"`
-    ToDid     string `json:"to_did"`
-    Price     int64  `json:"price"`
-    ExpiresAt string `json:"expires_at"`
-    Status    string `json:"status"`
+    ID              int64  `json:"id"`
+    ListingID       int64  `json:"listing_id"`
+    FromDid         string `json:"from_did"`
+    ToDid           string `json:"to_did"`
+    Price           int64  `json:"price"`
+    ExpiresAt       string `json:"expires_at"`
+    Status          string `json:"status"`
+    MerkleRoot      string `json:"merkle_root,omitempty"`
+    TotalChunks     int64  `json:"total_chunks,omitempty"`
+    ExpiresInBlocks int64  `json:"expires_in_blocks,omitempty"`
 }
 
 func (s *Store) CreateOffer(ctx context.Context, listingID int64, from, to []byte, price int64, exp time.Time) (Offer, error) {
@@ -28,13 +31,9 @@ func (s *Store) CreateOffer(ctx context.Context, listingID int64, from, to []byt
         return Offer{}, err
     }
     return Offer{
-        ID:        id,
-        ListingID: listingID,
-        FromDid:   hex.EncodeToString(from),
-        ToDid:     hex.EncodeToString(to),
-        Price:     price,
-        ExpiresAt: exp.UTC().Format(time.RFC3339),
-        Status:    "open",
+        ID: id, ListingID: listingID,
+        FromDid: hex.EncodeToString(from), ToDid: hex.EncodeToString(to),
+        Price: price, ExpiresAt: exp.UTC().Format(time.RFC3339), Status: "open",
     }, nil
 }
 
@@ -46,13 +45,27 @@ func (s *Store) CancelOffer(ctx context.Context, id int64) error {
     return err
 }
 
+func scanOffer(id, listingID, price, chunks, blocks int64, from, to, root []byte, exp time.Time, status string) Offer {
+    rootHex := ""
+    if len(root) > 0 {
+        rootHex = hex.EncodeToString(root)
+    }
+    return Offer{
+        ID: id, ListingID: listingID,
+        FromDid: hex.EncodeToString(from), ToDid: hex.EncodeToString(to),
+        Price: price, ExpiresAt: exp.UTC().Format(time.RFC3339), Status: status,
+        MerkleRoot: rootHex, TotalChunks: chunks, ExpiresInBlocks: blocks,
+    }
+}
+
 func (s *Store) ListOffers(ctx context.Context) ([]Offer, error) {
     _, _ = s.pool.Exec(ctx, `
         UPDATE offers SET status = 'expired'
         WHERE status = 'open' AND expires_at < now()
     `)
     rows, err := s.pool.Query(ctx, `
-        SELECT id, listing_id, from_did, to_did, price, expires_at, status
+        SELECT id, listing_id, from_did, to_did, price, expires_at, status,
+               merkle_root, COALESCE(total_chunks,0), COALESCE(expires_in_blocks,0)
         FROM offers
         ORDER BY id DESC
     `)
@@ -62,43 +75,32 @@ func (s *Store) ListOffers(ctx context.Context) ([]Offer, error) {
     defer rows.Close()
     var out []Offer
     for rows.Next() {
-        var id, listingID, price int64
-        var from, to []byte
+        var id, listingID, price, chunks, blocks int64
+        var from, to, root []byte
         var exp time.Time
         var status string
-        if err := rows.Scan(&id, &listingID, &from, &to, &price, &exp, &status); err != nil {
+        if err := rows.Scan(&id, &listingID, &from, &to, &price, &exp, &status, &root, &chunks, &blocks); err != nil {
             return nil, err
         }
-        out = append(out, Offer{
-            ID:        id,
-            ListingID: listingID,
-            FromDid:   hex.EncodeToString(from),
-            ToDid:     hex.EncodeToString(to),
-            Price:     price,
-            ExpiresAt: exp.UTC().Format(time.RFC3339),
-            Status:    status,
-        })
+        out = append(out, scanOffer(id, listingID, price, chunks, blocks, from, to, root, exp, status))
     }
     return out, rows.Err()
 }
 
 func (s *Store) GetOffer(ctx context.Context, id int64) (Offer, error) {
-    var listingID, price int64
-    var from, to []byte
+    var listingID, price, chunks, blocks int64
+    var from, to, root []byte
     var exp time.Time
     var status string
     err := s.pool.QueryRow(ctx, `
-        SELECT id, listing_id, from_did, to_did, price, expires_at, status
+        SELECT id, listing_id, from_did, to_did, price, expires_at, status,
+               merkle_root, COALESCE(total_chunks,0), COALESCE(expires_in_blocks,0)
         FROM offers WHERE id = $1
-    `, id).Scan(&id, &listingID, &from, &to, &price, &exp, &status)
+    `, id).Scan(&id, &listingID, &from, &to, &price, &exp, &status, &root, &chunks, &blocks)
     if err != nil {
         return Offer{}, err
     }
-    return Offer{
-        ID: id, ListingID: listingID,
-        FromDid: hex.EncodeToString(from), ToDid: hex.EncodeToString(to),
-        Price: price, ExpiresAt: exp.UTC().Format(time.RFC3339), Status: status,
-    }, nil
+    return scanOffer(id, listingID, price, chunks, blocks, from, to, root, exp, status), nil
 }
 
 func (s *Store) CounterOffer(ctx context.Context, oldID int64, price int64, exp time.Time) (Offer, error) {
@@ -123,7 +125,6 @@ func (s *Store) CounterOffer(ctx context.Context, oldID int64, price int64, exp 
     }
     return s.CreateOffer(ctx, old.ListingID, from, to, price, exp)
 }
-
 
 func (s *Store) AcceptOffer(ctx context.Context, id int64, who []byte) (Offer, error) {
     var from, to []byte
@@ -169,4 +170,13 @@ func (s *Store) AcceptOffer(ctx context.Context, id int64, who []byte) (Offer, e
         return Offer{}, err
     }
     return s.GetOffer(ctx, id)
+}
+
+func (s *Store) SetOfferSpec(ctx context.Context, id int64, root []byte, chunks, blocks int64) error {
+    _, err := s.pool.Exec(ctx, `
+        UPDATE offers
+        SET merkle_root = $2, total_chunks = $3, expires_in_blocks = $4
+        WHERE id = $1 AND status IN ('open','accepted')
+    `, id, root, chunks, blocks)
+    return err
 }

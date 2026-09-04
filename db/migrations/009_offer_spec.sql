@@ -1,0 +1,4 @@
+ALTER TABLE offers
+  ADD COLUMN IF NOT EXISTS merkle_root BYTEA,
+  ADD COLUMN IF NOT EXISTS total_chunks BIGINT,
+  ADD COLUMN IF NOT EXISTS expires_in_blocks BIGINT;
