@@ -89,3 +89,7 @@ Talk only. No funds. Cancel or wait for expiry.
 
     curl -s -X POST http://127.0.0.1:8080/v1/offers/ID/counter \
       -H 'Content-Type: application/json' -d '{"price":75}'
+
+    curl -s -X POST http://127.0.0.1:8080/v1/offers/ID/accept \
+      -H 'Content-Type: application/json' -d '{"did":"DID_HEX"}'
+Both parties must accept. Status becomes accepted only then. No funds.
