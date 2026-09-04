@@ -79,3 +79,10 @@ Status updates from AgentStatusChanged.
     curl -s -X POST http://127.0.0.1:8080/v1/listings \
       -H 'Content-Type: application/json' \
       -d '{"seller_did":"DID_HEX","title":"street photos v1","price":80}'
+
+## Offers
+
+Talk only. No funds. Cancel or wait for expiry.
+
+    curl -s http://127.0.0.1:8080/v1/offers
+    curl -s -X POST http://127.0.0.1:8080/v1/offers/1/cancel

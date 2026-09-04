@@ -177,7 +177,8 @@ func NewMux(db *store.Store) *http.ServeMux {
         }
         writeJSON(w, http.StatusOK, item)
     })
-    return mux
+    mountOffers(mux, db)
+	return mux
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {
