@@ -66,3 +66,17 @@ func DecodeDid(h string) ([]byte, error) {
     }
     return b, nil
 }
+
+
+func (s *Store) GetListing(ctx context.Context, id int64) (Listing, error) {
+    var seller []byte
+    var title string
+    var price int64
+    err := s.pool.QueryRow(ctx, `
+        SELECT id, seller_did, title, price FROM listings WHERE id = $1
+    `, id).Scan(&id, &seller, &title, &price)
+    if err != nil {
+        return Listing{}, err
+    }
+    return Listing{ID: id, SellerDid: hex.EncodeToString(seller), Title: title, Price: price}, nil
+}
