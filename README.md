@@ -100,3 +100,7 @@ Both parties must accept. Status becomes accepted only then. No funds.
 
     curl -s http://127.0.0.1:8080/v1/offers/ID/stamp
 Ready JSON is the register_commitment argument list. Market does not submit the extrinsic.
+
+    curl -s -X POST http://127.0.0.1:8080/v1/offers/ID/commitment \
+      -H 'Content-Type: application/json' \
+      -d '{"commitment_id":"COMMITMENT_HEX"}'
