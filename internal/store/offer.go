@@ -46,16 +46,20 @@ func (s *Store) CancelOffer(ctx context.Context, id int64) error {
     return err
 }
 
-func scanOffer(id, listingID, price, chunks, blocks int64, from, to, root []byte, exp time.Time, status string) Offer {
+func scanOffer(id, listingID, price, chunks, blocks int64, from, to, root, cid []byte, exp time.Time, status string) Offer {
     rootHex := ""
     if len(root) > 0 {
         rootHex = hex.EncodeToString(root)
+    }
+    cidHex := ""
+    if len(cid) > 0 {
+        cidHex = hex.EncodeToString(cid)
     }
     return Offer{
         ID: id, ListingID: listingID,
         FromDid: hex.EncodeToString(from), ToDid: hex.EncodeToString(to),
         Price: price, ExpiresAt: exp.UTC().Format(time.RFC3339), Status: status,
-        MerkleRoot: rootHex, TotalChunks: chunks, ExpiresInBlocks: blocks,
+        MerkleRoot: rootHex, TotalChunks: chunks, ExpiresInBlocks: blocks, CommitmentID: cidHex,
     }
 }
 
