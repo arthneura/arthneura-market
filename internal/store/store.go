@@ -14,9 +14,12 @@ type Store struct {
 }
 
 type Agent struct {
-    Did        string `json:"did"`
-    Controller string `json:"controller"`
-    Block      int64  `json:"block"`
+    Did          string `json:"did"`
+    Controller   string `json:"controller"`
+    Block        int64  `json:"block"`
+    Capabilities int64  `json:"capabilities"`
+    Status       string `json:"status"`
+    Label        string `json:"label"`
 }
 
 type Commitment struct {
@@ -51,8 +54,8 @@ func (s *Store) Close() {
 
 func (s *Store) UpsertAgent(ctx context.Context, did, controller []byte, block uint64) error {
     _, err := s.pool.Exec(ctx, `
-        INSERT INTO agents (did, controller, raw_event)
-        VALUES ($1, $2, jsonb_build_object('block', $3::bigint))
+        INSERT INTO agents (did, controller, raw_event, status)
+        VALUES ($1, $2, jsonb_build_object('block', $3::bigint), 'active')
         ON CONFLICT (did) DO UPDATE SET
             controller = EXCLUDED.controller,
             raw_event = EXCLUDED.raw_event,
@@ -61,9 +64,24 @@ func (s *Store) UpsertAgent(ctx context.Context, did, controller []byte, block u
     return err
 }
 
+func (s *Store) SetAgentStatus(ctx context.Context, did []byte, status string) error {
+    _, err := s.pool.Exec(ctx, `
+        UPDATE agents SET status = $2, updated_at = now() WHERE did = $1
+    `, did, status)
+    return err
+}
+
+func (s *Store) SetAgentProfile(ctx context.Context, did []byte, capabilities int64, label string) error {
+    _, err := s.pool.Exec(ctx, `
+        UPDATE agents SET capabilities = $2, label = $3, updated_at = now() WHERE did = $1
+    `, did, capabilities, label)
+    return err
+}
+
 func (s *Store) ListAgents(ctx context.Context) ([]Agent, error) {
     rows, err := s.pool.Query(ctx, `
-        SELECT did, controller, COALESCE((raw_event->>'block')::bigint, 0)
+        SELECT did, controller, COALESCE((raw_event->>'block')::bigint, 0),
+               COALESCE(capabilities,0), COALESCE(status,'active'), COALESCE(label,'')
         FROM agents
         ORDER BY updated_at DESC
     `)
@@ -88,7 +106,8 @@ func (s *Store) GetAgent(ctx context.Context, didHex string) (Agent, error) {
         return Agent{}, fmt.Errorf("bad did hex: %w", err)
     }
     row := s.pool.QueryRow(ctx, `
-        SELECT did, controller, COALESCE((raw_event->>'block')::bigint, 0)
+        SELECT did, controller, COALESCE((raw_event->>'block')::bigint, 0),
+               COALESCE(capabilities,0), COALESCE(status,'active'), COALESCE(label,'')
         FROM agents
         WHERE did = $1
     `, raw)
@@ -175,14 +194,21 @@ type scanner interface {
 func scanAgent(row scanner) (Agent, error) {
     var did []byte
     var controller string
-    var block int64
-    if err := row.Scan(&did, &controller, &block); err != nil {
+    var block, caps int64
+    var status, label string
+    if err := row.Scan(&did, &controller, &block, &caps, &status, &label); err != nil {
+        if err == pgx.ErrNoRows {
+            return Agent{}, err
+        }
         return Agent{}, err
     }
     return Agent{
-        Did:        hex.EncodeToString(did),
-        Controller: controller,
-        Block:      block,
+        Did:          hex.EncodeToString(did),
+        Controller:   controller,
+        Block:        block,
+        Capabilities: caps,
+        Status:       status,
+        Label:        label,
     }, nil
 }
 
