@@ -86,3 +86,6 @@ Talk only. No funds. Cancel or wait for expiry.
 
     curl -s http://127.0.0.1:8080/v1/offers
     curl -s -X POST http://127.0.0.1:8080/v1/offers/1/cancel
+
+    curl -s -X POST http://127.0.0.1:8080/v1/offers/ID/counter \
+      -H 'Content-Type: application/json' -d '{"price":75}'
