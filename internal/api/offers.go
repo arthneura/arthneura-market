@@ -95,4 +95,30 @@ func mountOffers(mux *http.ServeMux, db *store.Store) {
         }
         writeJSON(w, http.StatusOK, item)
     })
+
+    mux.HandleFunc("POST /v1/offers/{id}/accept", func(w http.ResponseWriter, r *http.Request) {
+        id, err := strconv.ParseInt(strings.TrimSpace(r.PathValue("id")), 10, 64)
+        if err != nil {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad id"})
+            return
+        }
+        var body struct {
+            Did string `json:"did"`
+        }
+        if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": "did required"})
+            return
+        }
+        who, err := store.DecodeDid(body.Did)
+        if err != nil {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad did"})
+            return
+        }
+        item, err := db.AcceptOffer(r.Context(), id, who)
+        if err != nil {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+            return
+        }
+        writeJSON(w, http.StatusOK, item)
+    })
 }
