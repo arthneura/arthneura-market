@@ -123,3 +123,50 @@ func (s *Store) CounterOffer(ctx context.Context, oldID int64, price int64, exp 
     }
     return s.CreateOffer(ctx, old.ListingID, from, to, price, exp)
 }
+
+
+func (s *Store) AcceptOffer(ctx context.Context, id int64, who []byte) (Offer, error) {
+    var from, to []byte
+    var accFrom, accTo bool
+    var status string
+    err := s.pool.QueryRow(ctx, `
+        SELECT from_did, to_did, accepted_from, accepted_to, status
+        FROM offers WHERE id = $1
+    `, id).Scan(&from, &to, &accFrom, &accTo, &status)
+    if err != nil {
+        return Offer{}, err
+    }
+    if status != "open" {
+        return Offer{}, fmt.Errorf("offer not open")
+    }
+    same := func(a, b []byte) bool {
+        if len(a) != len(b) {
+            return false
+        }
+        for i := range a {
+            if a[i] != b[i] {
+                return false
+            }
+        }
+        return true
+    }
+    if same(who, from) {
+        accFrom = true
+    } else if same(who, to) {
+        accTo = true
+    } else {
+        return Offer{}, fmt.Errorf("not a party")
+    }
+    st := "open"
+    if accFrom && accTo {
+        st = "accepted"
+    }
+    _, err = s.pool.Exec(ctx, `
+        UPDATE offers SET accepted_from = $2, accepted_to = $3, status = $4
+        WHERE id = $1
+    `, id, accFrom, accTo, st)
+    if err != nil {
+        return Offer{}, err
+    }
+    return s.GetOffer(ctx, id)
+}
