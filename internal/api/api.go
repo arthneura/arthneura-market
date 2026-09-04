@@ -126,6 +126,57 @@ func NewMux(db *store.Store) *http.ServeMux {
         }
         writeJSON(w, http.StatusOK, item)
     })
+    mux.HandleFunc("GET /v1/listings", func(w http.ResponseWriter, r *http.Request) {
+        items, err := db.ListListings(r.Context())
+        if err != nil {
+            writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+            return
+        }
+        if items == nil {
+            items = []store.Listing{}
+        }
+        writeJSON(w, http.StatusOK, map[string]any{"listings": items})
+    })
+    mux.HandleFunc("POST /v1/listings", func(w http.ResponseWriter, r *http.Request) {
+        var body struct {
+            SellerDid string `json:"seller_did"`
+            Title     string `json:"title"`
+            Price     int64  `json:"price"`
+        }
+        if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad json"})
+            return
+        }
+        body.Title = strings.TrimSpace(body.Title)
+        if body.Title == "" || body.Price < 0 {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": "title and non-negative price required"})
+            return
+        }
+        seller, err := store.DecodeDid(body.SellerDid)
+        if err != nil {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+            return
+        }
+        agent, err := db.GetAgent(r.Context(), body.SellerDid)
+        if errors.Is(err, pgx.ErrNoRows) {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": "seller not registered"})
+            return
+        }
+        if err != nil {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+            return
+        }
+        if agent.Status != "" && agent.Status != "active" {
+            writeJSON(w, http.StatusForbidden, map[string]string{"error": "seller not active"})
+            return
+        }
+        item, err := db.CreateListing(r.Context(), seller, body.Title, body.Price)
+        if err != nil {
+            writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+            return
+        }
+        writeJSON(w, http.StatusOK, item)
+    })
     return mux
 }
 
