@@ -106,3 +106,5 @@ Ready JSON is the register_commitment argument list. Market does not submit the 
       -d '{"commitment_id":"COMMITMENT_HEX"}'
 
 Indexer auto-links an accepted offer to a new commitment when provider and consumer DIDs match.
+
+    go test ./internal/offersign
