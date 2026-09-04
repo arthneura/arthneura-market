@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/hex"
     "encoding/json"
     "net/http"
     "strconv"
@@ -117,6 +118,38 @@ func mountOffers(mux *http.ServeMux, db *store.Store) {
         item, err := db.AcceptOffer(r.Context(), id, who)
         if err != nil {
             writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+            return
+        }
+        writeJSON(w, http.StatusOK, item)
+    })
+
+    mux.HandleFunc("POST /v1/offers/{id}/spec", func(w http.ResponseWriter, r *http.Request) {
+        id, err := strconv.ParseInt(strings.TrimSpace(r.PathValue("id")), 10, 64)
+        if err != nil {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad id"})
+            return
+        }
+        var body struct {
+            MerkleRoot      string `json:"merkle_root"`
+            TotalChunks     int64  `json:"total_chunks"`
+            ExpiresInBlocks int64  `json:"expires_in_blocks"`
+        }
+        if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad json"})
+            return
+        }
+        root, err := hex.DecodeString(strings.TrimSpace(body.MerkleRoot))
+        if err != nil || len(root) != 32 || body.TotalChunks <= 0 || body.ExpiresInBlocks <= 0 {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": "root 32-byte hex, chunks and blocks > 0"})
+            return
+        }
+        if err := db.SetOfferSpec(r.Context(), id, root, body.TotalChunks, body.ExpiresInBlocks); err != nil {
+            writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+            return
+        }
+        item, err := db.GetOffer(r.Context(), id)
+        if err != nil {
+            writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
             return
         }
         writeJSON(w, http.StatusOK, item)
