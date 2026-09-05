@@ -111,3 +111,5 @@ Indexer auto-links an accepted offer to a new commitment when provider and consu
 
 POST /v1/offers and /v1/offers/ID/counter need did + sr25519 signature.
     ANNOUNCE_SEED=... go run ./cmd/offer-sign -action create -id 1 -did DID -price 70
+
+POST /v1/offers/ID/accept and /cancel also need signature.
