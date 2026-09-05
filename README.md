@@ -131,3 +131,7 @@ Refuses if stamp is not ready or deliver_url is missing. Verifies chunks against
 
     PAYLOAD='arthneura stamp payload spec sync' go run ./cmd/provider -offer 3
 Refuses to serve if local merkle root != stamp root.
+
+    curl -s http://127.0.0.1:8080/v1/offers/3/next
+    curl -s http://127.0.0.1:8080/v1/commitments/COMMITMENT_HEX/next
+Board only names the next chain call. submit is always false.
