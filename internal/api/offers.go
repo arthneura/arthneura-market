@@ -226,6 +226,19 @@ func mountOffers(mux *http.ServeMux, db *store.Store) {
         } else {
             consumer = off.ToDid
         }
+        ready := false
+        reason := "commitment not linked"
+        if off.CommitmentID != "" {
+            c, err := db.GetCommitment(r.Context(), off.CommitmentID)
+            if err != nil {
+                reason = "commitment not indexed"
+            } else if c.MerkleRoot != off.MerkleRoot || c.TotalChunks != off.TotalChunks {
+                reason = "offer spec does not match chain commitment"
+            } else {
+                ready = true
+                reason = ""
+            }
+        }
         writeJSON(w, http.StatusOK, map[string]any{
             "offer_id":           off.ID,
             "provider_did":       provider,
@@ -234,7 +247,9 @@ func mountOffers(mux *http.ServeMux, db *store.Store) {
             "total_chunks":       off.TotalChunks,
             "expires_in_blocks":  off.ExpiresInBlocks,
             "price":              off.Price,
-            "ready":              true,
+            "commitment_id":      off.CommitmentID,
+            "ready":              ready,
+            "reason":             reason,
         })
     })
 
