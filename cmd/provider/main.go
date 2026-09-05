@@ -9,7 +9,6 @@ import (
     "net/http"
     "os"
     "strconv"
-    "strings"
 
     "github.com/arthneura/arthneura-market/internal/deliver"
     "github.com/arthneura/arthneura-market/internal/merkle"
