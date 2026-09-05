@@ -207,12 +207,12 @@ func (s *Store) SetOfferCommitment(ctx context.Context, offerID int64, commitmen
 }
 
 
-func (s *Store) LinkOfferByParties(ctx context.Context, provider, consumer, commitmentID []byte) error {
+func (s *Store) LinkOfferByParties(ctx context.Context, provider, consumer, commitmentID, root []byte, chunks int64) error {
     if len(commitmentID) != 32 {
         return fmt.Errorf("commitment id must be 32 bytes")
     }
     tag, err := s.pool.Exec(ctx, `
-        UPDATE offers SET commitment_id = $3
+        UPDATE offers SET commitment_id = $3, merkle_root = $4, total_chunks = $5
         WHERE id = (
             SELECT id FROM offers
             WHERE status = 'accepted'
@@ -224,7 +224,7 @@ func (s *Store) LinkOfferByParties(ctx context.Context, provider, consumer, comm
             ORDER BY id DESC
             LIMIT 1
         )
-    `, provider, consumer, commitmentID)
+    `, provider, consumer, commitmentID, root, chunks)
     if err != nil {
         return err
     }

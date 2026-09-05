@@ -232,7 +232,7 @@ func handleHead(ctx context.Context, api *gsrpc.SubstrateAPI, db *store.Store, h
         if db != nil {
             _ = db.UpsertCommitment(ctx, e.CommitmentID[:], e.Provider[:], e.Consumer[:], e.MerkleRoot[:],
                 uint64(e.TotalChunks), uint64(e.ExpiresAt), uint64(head.Number))
-            if err := db.LinkOfferByParties(ctx, e.Provider[:], e.Consumer[:], e.CommitmentID[:]); err != nil {
+            if err := db.LinkOfferByParties(ctx, e.Provider[:], e.Consumer[:], e.CommitmentID[:], e.MerkleRoot[:], int64(e.TotalChunks)); err != nil {
                 log.Printf("auto-link skip: %v", err)
             } else {
                 log.Printf("auto-linked offer to commitment=%s", hex.EncodeToString(e.CommitmentID[:]))
