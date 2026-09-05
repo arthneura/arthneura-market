@@ -74,6 +74,20 @@ func mountOffers(mux *http.ServeMux, db *store.Store) {
             writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad id"})
             return
         }
+        var body struct {
+            Did       string `json:"did"`
+            Price     int64  `json:"price"`
+            ExpiresAt int64  `json:"expires_at"`
+            Signature string `json:"signature"`
+        }
+        if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": "did and signature required"})
+            return
+        }
+        if err := verifyOfferSig(r.Context(), db, "cancel", id, body.Did, body.Price, body.ExpiresAt, body.Signature); err != nil {
+            writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+            return
+        }
         if err := db.CancelOffer(r.Context(), id); err != nil {
             writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
             return
@@ -123,10 +137,17 @@ func mountOffers(mux *http.ServeMux, db *store.Store) {
             return
         }
         var body struct {
-            Did string `json:"did"`
+            Did       string `json:"did"`
+            Price     int64  `json:"price"`
+            ExpiresAt int64  `json:"expires_at"`
+            Signature string `json:"signature"`
         }
         if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
             writeJSON(w, http.StatusBadRequest, map[string]string{"error": "did required"})
+            return
+        }
+        if err := verifyOfferSig(r.Context(), db, "accept", id, body.Did, body.Price, body.ExpiresAt, body.Signature); err != nil {
+            writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
             return
         }
         who, err := store.DecodeDid(body.Did)
