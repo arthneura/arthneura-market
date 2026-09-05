@@ -210,6 +210,7 @@ func NewMux(db *store.Store) *http.ServeMux {
         writeJSON(w, http.StatusOK, item)
     })
     mountOffers(mux, db)
+	mountNext(mux, db)
 	return mux
 }
 
