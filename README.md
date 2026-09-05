@@ -120,3 +120,5 @@ Unsigned body is rejected.
 
     curl -s "http://127.0.0.1:8080/v1/listings?status=active"
     curl -s "http://127.0.0.1:8080/v1/listings?cap=16"
+
+Indexer copies merkle_root and total_chunks from CommitmentRegistered onto the linked offer.
