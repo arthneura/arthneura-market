@@ -113,3 +113,7 @@ POST /v1/offers and /v1/offers/ID/counter need did + sr25519 signature.
     ANNOUNCE_SEED=... go run ./cmd/offer-sign -action create -id 1 -did DID -price 70
 
 POST /v1/offers/ID/accept and /cancel also need signature.
+
+POST /v1/listings needs seller controller sr25519 over
+seller_did + title + price + expires_at.
+Unsigned body is rejected.
