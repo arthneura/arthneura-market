@@ -128,3 +128,6 @@ merkle_root and total_chunks match the offer spec.
 
     go run ./cmd/pull -offer 3
 Refuses if stamp is not ready or deliver_url is missing. Verifies chunks against board root.
+
+    PAYLOAD='arthneura stamp payload spec sync' go run ./cmd/provider -offer 3
+Refuses to serve if local merkle root != stamp root.
