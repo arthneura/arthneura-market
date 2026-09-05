@@ -1,6 +1,7 @@
 package api
 
 import (
+    "strconv"
     "encoding/hex"
     "encoding/json"
     "errors"
@@ -128,7 +129,17 @@ func NewMux(db *store.Store) *http.ServeMux {
         writeJSON(w, http.StatusOK, item)
     })
     mux.HandleFunc("GET /v1/listings", func(w http.ResponseWriter, r *http.Request) {
-        items, err := db.ListListings(r.Context())
+        status := strings.TrimSpace(r.URL.Query().Get("status"))
+        var cap int64
+        if s := strings.TrimSpace(r.URL.Query().Get("cap")); s != "" {
+            var err error
+            cap, err = strconv.ParseInt(s, 10, 64)
+            if err != nil || cap < 0 {
+                writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad cap"})
+                return
+            }
+        }
+        items, err := db.ListListings(r.Context(), status, cap)
         if err != nil {
             writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
             return

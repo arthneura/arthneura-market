@@ -7,10 +7,12 @@ import (
 )
 
 type Listing struct {
-    ID        int64  `json:"id"`
-    SellerDid string `json:"seller_did"`
-    Title     string `json:"title"`
-    Price     int64  `json:"price"`
+    ID           int64  `json:"id"`
+    SellerDid    string `json:"seller_did"`
+    Title        string `json:"title"`
+    Price        int64  `json:"price"`
+    SellerStatus string `json:"seller_status,omitempty"`
+    Capabilities int64  `json:"capabilities,omitempty"`
 }
 
 func (s *Store) CreateListing(ctx context.Context, seller []byte, title string, price int64) (Listing, error) {
@@ -31,29 +33,35 @@ func (s *Store) CreateListing(ctx context.Context, seller []byte, title string, 
     }, nil
 }
 
-func (s *Store) ListListings(ctx context.Context) ([]Listing, error) {
+func (s *Store) ListListings(ctx context.Context, status string, cap int64) ([]Listing, error) {
     rows, err := s.pool.Query(ctx, `
-        SELECT id, seller_did, title, price
-        FROM listings
-        ORDER BY id DESC
-    `)
+        SELECT l.id, l.seller_did, l.title, l.price,
+               COALESCE(a.status, 'active'), COALESCE(a.capabilities, 0)
+        FROM listings l
+        LEFT JOIN agents a ON a.did = l.seller_did
+        WHERE ($1 = '' OR COALESCE(a.status, 'active') = $1)
+          AND ($2 = 0 OR (COALESCE(a.capabilities, 0) & $2) = $2)
+        ORDER BY l.id DESC
+    `, status, cap)
     if err != nil {
         return nil, err
     }
     defer rows.Close()
     var out []Listing
     for rows.Next() {
-        var id, price int64
+        var id, price, caps int64
         var did []byte
-        var title string
-        if err := rows.Scan(&id, &did, &title, &price); err != nil {
+        var title, st string
+        if err := rows.Scan(&id, &did, &title, &price, &st, &caps); err != nil {
             return nil, err
         }
         out = append(out, Listing{
-            ID:        id,
-            SellerDid: hex.EncodeToString(did),
-            Title:     title,
-            Price:     price,
+            ID:           id,
+            SellerDid:    hex.EncodeToString(did),
+            Title:        title,
+            Price:        price,
+            SellerStatus: st,
+            Capabilities: caps,
         })
     }
     return out, rows.Err()
@@ -66,7 +74,6 @@ func DecodeDid(h string) ([]byte, error) {
     }
     return b, nil
 }
-
 
 func (s *Store) GetListing(ctx context.Context, id int64) (Listing, error) {
     var seller []byte

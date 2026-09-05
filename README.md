@@ -117,3 +117,6 @@ POST /v1/offers/ID/accept and /cancel also need signature.
 POST /v1/listings needs seller controller sr25519 over
 seller_did + title + price + expires_at.
 Unsigned body is rejected.
+
+    curl -s "http://127.0.0.1:8080/v1/listings?status=active"
+    curl -s "http://127.0.0.1:8080/v1/listings?cap=16"
