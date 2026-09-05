@@ -125,3 +125,6 @@ Indexer copies merkle_root and total_chunks from CommitmentRegistered onto the l
 
 GET /v1/offers/ID/stamp is ready:true only when the linked commitment
 merkle_root and total_chunks match the offer spec.
+
+    go run ./cmd/pull -offer 3
+Refuses if stamp is not ready or deliver_url is missing. Verifies chunks against board root.
