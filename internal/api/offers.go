@@ -30,6 +30,8 @@ func mountOffers(mux *http.ServeMux, db *store.Store) {
             ToDid     string `json:"to_did"`
             Price     int64  `json:"price"`
             ExpiresIn int64  `json:"expires_in_sec"`
+            ExpiresAt int64  `json:"expires_at"`
+            Signature string `json:"signature"`
         }
         if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
             writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad json"})
@@ -51,6 +53,13 @@ func mountOffers(mux *http.ServeMux, db *store.Store) {
         }
         if body.ExpiresIn <= 0 {
             body.ExpiresIn = 1800
+        }
+        if body.ExpiresAt <= 0 {
+            body.ExpiresAt = time.Now().Unix() + body.ExpiresIn
+        }
+        if err := verifyOfferSig(r.Context(), db, "create", body.ListingID, body.FromDid, body.Price, body.ExpiresAt, body.Signature); err != nil {
+            writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+            return
         }
         item, err := db.CreateOffer(r.Context(), body.ListingID, from, to, body.Price, time.Now().Add(time.Duration(body.ExpiresIn)*time.Second))
         if err != nil {
@@ -79,8 +88,11 @@ func mountOffers(mux *http.ServeMux, db *store.Store) {
             return
         }
         var body struct {
-            Price     int64 `json:"price"`
-            ExpiresIn int64 `json:"expires_in_sec"`
+            Did       string `json:"did"`
+            Price     int64  `json:"price"`
+            ExpiresIn int64  `json:"expires_in_sec"`
+            ExpiresAt int64  `json:"expires_at"`
+            Signature string `json:"signature"`
         }
         if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Price < 0 {
             writeJSON(w, http.StatusBadRequest, map[string]string{"error": "price required"})
@@ -88,6 +100,13 @@ func mountOffers(mux *http.ServeMux, db *store.Store) {
         }
         if body.ExpiresIn <= 0 {
             body.ExpiresIn = 1800
+        }
+        if body.ExpiresAt <= 0 {
+            body.ExpiresAt = time.Now().Unix() + body.ExpiresIn
+        }
+        if err := verifyOfferSig(r.Context(), db, "counter", id, body.Did, body.Price, body.ExpiresAt, body.Signature); err != nil {
+            writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+            return
         }
         item, err := db.CounterOffer(r.Context(), id, body.Price, time.Now().Add(time.Duration(body.ExpiresIn)*time.Second))
         if err != nil {
