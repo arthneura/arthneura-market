@@ -10,6 +10,7 @@ import (
     "github.com/jackc/pgx/v5"
 
     "github.com/arthneura/arthneura-market/internal/announce"
+    "github.com/arthneura/arthneura-market/internal/offersign"
     "github.com/arthneura/arthneura-market/internal/store"
 )
 
@@ -142,6 +143,8 @@ func NewMux(db *store.Store) *http.ServeMux {
             SellerDid string `json:"seller_did"`
             Title     string `json:"title"`
             Price     int64  `json:"price"`
+            ExpiresAt int64  `json:"expires_at"`
+            Signature string `json:"signature"`
         }
         if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
             writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad json"})
@@ -168,6 +171,24 @@ func NewMux(db *store.Store) *http.ServeMux {
         }
         if agent.Status != "" && agent.Status != "active" {
             writeJSON(w, http.StatusForbidden, map[string]string{"error": "seller not active"})
+            return
+        }
+        ctrl, err := hex.DecodeString(agent.Controller)
+        if err != nil || len(ctrl) != 32 {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad controller"})
+            return
+        }
+        sigb, err := hex.DecodeString(strings.TrimSpace(body.Signature))
+        if err != nil || len(sigb) != 64 {
+            writeJSON(w, http.StatusBadRequest, map[string]string{"error": "signature must be 64-byte hex"})
+            return
+        }
+        var pub [32]byte
+        var sig [64]byte
+        copy(pub[:], ctrl)
+        copy(sig[:], sigb)
+        if err := offersign.VerifyListing(pub, sig, body.SellerDid, body.Title, body.Price, body.ExpiresAt); err != nil {
+            writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
             return
         }
         item, err := db.CreateListing(r.Context(), seller, body.Title, body.Price)
