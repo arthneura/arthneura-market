@@ -108,3 +108,6 @@ Ready JSON is the register_commitment argument list. Market does not submit the 
 Indexer auto-links an accepted offer to a new commitment when provider and consumer DIDs match.
 
     go test ./internal/offersign
+
+POST /v1/offers and /v1/offers/ID/counter need did + sr25519 signature.
+    ANNOUNCE_SEED=... go run ./cmd/offer-sign -action create -id 1 -did DID -price 70
