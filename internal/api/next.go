@@ -72,7 +72,7 @@ func nextAction(c store.Commitment, offerID int64) map[string]any {
         out["reason"] = ""
     case "acknowledged":
         out["action"] = "close_commitment"
-        out["caller"] = "provider"
+        out["caller"] = "consumer"
         out["ready"] = true
         out["reason"] = ""
     case "disputed":
