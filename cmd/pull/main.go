@@ -1,6 +1,7 @@
 package main
 
 import (
+    "bytes"
     "encoding/hex"
     "encoding/json"
     "flag"
@@ -144,7 +145,20 @@ func main() {
     if err := os.WriteFile(received, all, 0o644); err != nil {
         log.Fatal(err)
     }
-    fmt.Printf("RECEIVED_FILE=%s\n", received)
+    var lines [][]byte
+    for i := 0; i < total; i++ {
+        raw, err := os.ReadFile(filepath.Join(outDir, fmt.Sprintf("%d.bin", i)))
+        if err != nil {
+            log.Fatal(err)
+        }
+        lines = append(lines, raw)
+    }
+    csvPath := filepath.Join(outDir, "received.csv")
+    if err := os.WriteFile(csvPath, append(bytes.Join(lines, []byte("\n")), '\n'), 0o644); err != nil {
+        log.Fatal(err)
+    }
+    fmt.Printf("RECEIVED_FILE=%s\n", csvPath)
+    fmt.Printf("RECEIVED_BIN=%s\n", received)
     fmt.Printf("EVIDENCE_DIR=%s\n", outDir)
     log.Printf("all chunks verified")
 }

@@ -30,7 +30,7 @@ for PAIR in "alice:$PROVIDER_DID" "bob:$CONSUMER_DID"; do
 done
 PAYLOAD="$(cat "$CSV")"
 cd "$CORE"
-REG="$(ACTION=register SIGNER=alice PROVIDER_DID="0x$PROVIDER_DID" CONSUMER_DID="0x$CONSUMER_DID" PRICE=1000 PAYLOAD="$PAYLOAD" cargo run -q -p offchain-vector-db)"
+REG="$(ACTION=register SIGNER=alice PROVIDER_DID="0x$PROVIDER_DID" CONSUMER_DID="0x$CONSUMER_DID" PRICE=1000 CHUNK_MODE=rows PAYLOAD="$PAYLOAD" cargo run -q -p offchain-vector-db)"
 echo "$REG"
 CID="$(echo "$REG" | sed -n "s/^COMMITMENT_ID=0x//p" | tail -n 1)"
 ROOTHEX="$(echo "$REG" | sed -n "s/^MERKLE_ROOT=0x//p" | tail -n 1)"
@@ -41,7 +41,7 @@ curl -sf -X POST "http://127.0.0.1:8080/v1/offers/$OID/commitment" -H "Content-T
 cd "$CORE"
 ACTION=acknowledge SIGNER=bob COMMITMENT_ID="0x$CID" CONSUMER_DID="0x$CONSUMER_DID" cargo run -q -p offchain-vector-db
 cd "$ROOT"
-PAYLOAD="$PAYLOAD" go run ./cmd/provider -offer "$OID" &
+CHUNK_MODE=rows PAYLOAD="$PAYLOAD" go run ./cmd/provider -offer "$OID" &
 PROV_PID=$!
 sleep 2
 AN="$(SIGNER=alice go run ./cmd/announce -id "$CID" -url http://127.0.0.1:8090 -exp "$EXP")"
