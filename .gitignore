@@ -3,3 +3,4 @@ bin/
 vendor/
 *.log
 .DS_Store
+artifacts/

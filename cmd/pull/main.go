@@ -8,9 +8,11 @@ import (
     "log"
     "net/http"
     "os"
+    "path/filepath"
     "strings"
 
     "github.com/arthneura/arthneura-market/internal/deliver"
+	"github.com/arthneura/arthneura-market/internal/merkle"
 )
 
 type stamp struct {
@@ -98,16 +100,52 @@ func main() {
     }
     log.Printf("%s url=%s total=%d root=%s", label, base, total, rootHex)
 
+    outDir := os.Getenv("EVIDENCE_DIR")
+    if outDir == "" {
+        cid := strings.TrimPrefix(strings.TrimSpace(os.Getenv("COMMITMENT_ID")), "0x")
+        if cid == "" && strings.Contains(label, "commitment=") {
+            parts := strings.Split(label, "commitment=")
+            cid = strings.TrimSpace(parts[len(parts)-1])
+        }
+        if cid == "" {
+            cid = "unknown"
+        }
+        outDir = filepath.Join("artifacts", cid)
+    }
+    if err := os.MkdirAll(outDir, 0o755); err != nil {
+        log.Fatal(err)
+    }
+
+    var all []byte
     for i := 0; i < total; i++ {
         var box deliver.ChunkBox
         if err := getJSON(fmt.Sprintf("%s/chunks/%d", base, i), &box); err != nil {
             log.Fatal(err)
         }
         if !deliver.VerifyBox(box, total, root) {
+            raw, _, _ := deliver.DecodeBox(box)
+            h := merkle.HashBytes(raw)
+            fmt.Printf("CHUNK_HASH_%d=0x%x\n", i, h)
             log.Fatalf("chunk %d VERIFY FAIL against board root", i)
         }
+        raw, _, err := deliver.DecodeBox(box)
+        if err != nil {
+            log.Fatal(err)
+        }
+        if err := os.WriteFile(filepath.Join(outDir, fmt.Sprintf("%d.bin", i)), raw, 0o644); err != nil {
+            log.Fatal(err)
+        }
+        h := merkle.HashBytes(raw)
+        fmt.Printf("CHUNK_HASH_%d=0x%x\n", i, h)
+        all = append(all, raw...)
         log.Printf("chunk %d ok", i)
     }
+    received := filepath.Join(outDir, "received.bin")
+    if err := os.WriteFile(received, all, 0o644); err != nil {
+        log.Fatal(err)
+    }
+    fmt.Printf("RECEIVED_FILE=%s\n", received)
+    fmt.Printf("EVIDENCE_DIR=%s\n", outDir)
     log.Printf("all chunks verified")
 }
 
