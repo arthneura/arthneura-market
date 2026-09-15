@@ -51,15 +51,21 @@ sleep 2
 AN="$(SIGNER=alice go run ./cmd/announce -id "$CID" -url http://127.0.0.1:8090 -exp "$EXP")"
 SIG="$(echo "$AN" | python3 -c "import sys,json; print(json.load(sys.stdin)[\"signature\"])")"
 curl -sf -X POST "http://127.0.0.1:8080/v1/commitments/$CID/deliver" -H "Content-Type: application/json" -d "{\"url\":\"http://127.0.0.1:8090\",\"expires_at\":$EXP,\"signature\":\"$SIG\"}" >/dev/null
-go run ./cmd/pull -offer "$OID"
+PULL_OUT="$(go run ./cmd/pull -offer "$OID" 2>&1)"
+echo "$PULL_OUT"
+RECV="$(echo "$PULL_OUT" | sed -n "s/^RECEIVED_FILE=//p" | tail -n 1)"
+HASH0="$(echo "$PULL_OUT" | sed -n "s/^CHUNK_HASH_0=0x//p" | tail -n 1)"
+[ -n "$RECV" ] && [ -n "$HASH0" ] || { echo "ERROR evidence missing"; echo "$PULL_OUT"; exit 1; }
 set +e
-go run ./cmd/csvcheck "$CSV"
+CHK="$(go run ./cmd/csvcheck "$RECV" 2>&1)"
 CSV_OK=$?
 set -e
+echo "$CHK"
 kill $PROV_PID >/dev/null 2>&1 || true
 [ "$CSV_OK" -ne 0 ] || { echo "ERROR schema should fail"; exit 1; }
+echo "RAISE_HASH=0x$HASH0"
 cd "$CORE"
-ACTION=raise SIGNER=bob COMMITMENT_ID="0x$CID" CONSUMER_DID="0x$CONSUMER_DID" CHUNK_INDEX=0 TOTAL_CHUNKS="$CHUNKS" RECEIVED_CHUNK_HASH=0000000000000000000000000000000000000000000000000000000000000001 cargo run -q -p offchain-vector-db
+ACTION=raise SIGNER=bob COMMITMENT_ID="0x$CID" CONSUMER_DID="0x$CONSUMER_DID" CHUNK_INDEX=0 TOTAL_CHUNKS="$CHUNKS" RECEIVED_CHUNK_HASH="$HASH0" cargo run -q -p offchain-vector-db
 echo "=== wait window ==="
 sleep 90
 ACTION=finalize SIGNER=bob COMMITMENT_ID="0x$CID" cargo run -q -p offchain-vector-db
