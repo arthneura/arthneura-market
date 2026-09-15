@@ -1,6 +1,7 @@
 package main
 
 import (
+    "bytes"
     "encoding/hex"
     "encoding/json"
     "flag"
@@ -89,6 +90,19 @@ func main() {
 }
 
 func splitPayload(payload []byte, n int) [][]byte {
+    if os.Getenv("CHUNK_MODE") == "rows" {
+        var out [][]byte
+        for _, line := range bytes.Split(payload, []byte("\n")) {
+            if len(line) > 0 && line[len(line)-1] == '\r' {
+                line = line[:len(line)-1]
+            }
+            if len(line) == 0 {
+                continue
+            }
+            out = append(out, line)
+        }
+        return out
+    }
     if n == 1 {
         return [][]byte{payload}
     }
