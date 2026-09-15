@@ -86,7 +86,7 @@ curl -s http://127.0.0.1:8080/v1/commitments
 
 Commitment JSON status: `registered`, `acknowledged`, `settled`, `disputed`, `finalized`, `expired`.
 
-A longer copy-paste cookbook is [#30](https://github.com/arthneura/arthneura-market/issues/30).
+A longer copy-paste cookbook is docs/cookbook.md.
 
 ## Listings and offers
 
@@ -166,7 +166,7 @@ internal/        merkle, offers, sign
 
 ## If you want to help
 
-- [#30](https://github.com/arthneura/arthneura-market/issues/30) — curl cookbook for `/health` `/agents` `/commitments` `/offers`
+- docs/cookbook.md — curl paths plus the three CSV scripts
 
 Do not add “just submit the extrinsic for them.” That belongs nowhere in this repo.
 
