@@ -56,3 +56,10 @@ Counter: good CSV, buyer raises 000...1 on row 1, seller proves the leaf.
 ## Not this repo
 
 Dispute window, escrow, proofs: arthneura-core / scripts/demo.md
+
+## Docker images
+
+    docker build --target indexer -t arthneura-indexer:local .
+    docker build --target api -t arthneura-api:local .
+
+CHAIN_WS and DATABASE_URL are read from the environment. HTTP_ADDR defaults to :8080.
