@@ -19,15 +19,20 @@ type Offer struct {
     TotalChunks     int64  `json:"total_chunks,omitempty"`
     ExpiresInBlocks int64  `json:"expires_in_blocks,omitempty"`
 	CommitmentID    string `json:"commitment_id,omitempty"`
+    Schema          string `json:"schema,omitempty"`
 }
 
 func (s *Store) CreateOffer(ctx context.Context, listingID int64, from, to []byte, price int64, exp time.Time) (Offer, error) {
+    listing, err := s.GetListing(ctx, listingID)
+    if err != nil {
+        return Offer{}, err
+    }
     var id int64
-    err := s.pool.QueryRow(ctx, `
-        INSERT INTO offers (listing_id, from_did, to_did, price, expires_at, status)
-        VALUES ($1,$2,$3,$4,$5,'open')
+    err = s.pool.QueryRow(ctx, `
+        INSERT INTO offers (listing_id, from_did, to_did, price, expires_at, status, schema)
+        VALUES ($1,$2,$3,$4,$5,'open',$6)
         RETURNING id
-    `, listingID, from, to, price, exp).Scan(&id)
+    `, listingID, from, to, price, exp, listing.Schema).Scan(&id)
     if err != nil {
         return Offer{}, err
     }
@@ -35,6 +40,7 @@ func (s *Store) CreateOffer(ctx context.Context, listingID int64, from, to []byt
         ID: id, ListingID: listingID,
         FromDid: hex.EncodeToString(from), ToDid: hex.EncodeToString(to),
         Price: price, ExpiresAt: exp.UTC().Format(time.RFC3339), Status: "open",
+        Schema: listing.Schema,
     }, nil
 }
 
@@ -46,7 +52,7 @@ func (s *Store) CancelOffer(ctx context.Context, id int64) error {
     return err
 }
 
-func scanOffer(id, listingID, price, chunks, blocks int64, from, to, root, cid []byte, exp time.Time, status string) Offer {
+func scanOffer(id, listingID, price, chunks, blocks int64, from, to, root, cid []byte, exp time.Time, status, schema string) Offer {
     rootHex := ""
     if len(root) > 0 {
         rootHex = hex.EncodeToString(root)
@@ -60,6 +66,7 @@ func scanOffer(id, listingID, price, chunks, blocks int64, from, to, root, cid [
         FromDid: hex.EncodeToString(from), ToDid: hex.EncodeToString(to),
         Price: price, ExpiresAt: exp.UTC().Format(time.RFC3339), Status: status,
         MerkleRoot: rootHex, TotalChunks: chunks, ExpiresInBlocks: blocks, CommitmentID: cidHex,
+        Schema: schema,
     }
 }
 
@@ -71,7 +78,7 @@ func (s *Store) ListOffers(ctx context.Context) ([]Offer, error) {
     rows, err := s.pool.Query(ctx, `
         SELECT id, listing_id, from_did, to_did, price, expires_at, status,
                merkle_root, COALESCE(total_chunks,0), COALESCE(expires_in_blocks,0),
-               commitment_id
+               commitment_id, COALESCE(schema,'')
         FROM offers
         ORDER BY id DESC
     `)
@@ -85,10 +92,11 @@ func (s *Store) ListOffers(ctx context.Context) ([]Offer, error) {
         var from, to, root, cid []byte
         var exp time.Time
         var status string
-        if err := rows.Scan(&id, &listingID, &from, &to, &price, &exp, &status, &root, &chunks, &blocks, &cid); err != nil {
+        var schema string
+        if err := rows.Scan(&id, &listingID, &from, &to, &price, &exp, &status, &root, &chunks, &blocks, &cid, &schema); err != nil {
             return nil, err
         }
-        out = append(out, scanOffer(id, listingID, price, chunks, blocks, from, to, root, cid, exp, status))
+        out = append(out, scanOffer(id, listingID, price, chunks, blocks, from, to, root, cid, exp, status, schema))
     }
     return out, rows.Err()
 }
@@ -98,16 +106,17 @@ func (s *Store) GetOffer(ctx context.Context, id int64) (Offer, error) {
     var from, to, root, cid []byte
     var exp time.Time
     var status string
+    var schema string
     err := s.pool.QueryRow(ctx, `
         SELECT id, listing_id, from_did, to_did, price, expires_at, status,
                merkle_root, COALESCE(total_chunks,0), COALESCE(expires_in_blocks,0),
-               commitment_id
+               commitment_id, COALESCE(schema,'')
         FROM offers WHERE id = $1
-    `, id).Scan(&id, &listingID, &from, &to, &price, &exp, &status, &root, &chunks, &blocks, &cid)
+    `, id).Scan(&id, &listingID, &from, &to, &price, &exp, &status, &root, &chunks, &blocks, &cid, &schema)
     if err != nil {
         return Offer{}, err
     }
-    return scanOffer(id, listingID, price, chunks, blocks, from, to, root, cid, exp, status), nil
+    return scanOffer(id, listingID, price, chunks, blocks, from, to, root, cid, exp, status, schema), nil
 }
 
 func (s *Store) CounterOffer(ctx context.Context, oldID int64, price int64, exp time.Time) (Offer, error) {
