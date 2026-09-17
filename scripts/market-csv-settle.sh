@@ -5,7 +5,7 @@ CORE="${ARTHNEURA_CORE:-/Users/sumit/arthneura-core}"
 CSV="$ROOT/testdata/csv/good.csv"
 cd "$ROOT"
 curl -sf http://127.0.0.1:8080/health >/dev/null || { echo "ERROR api down"; exit 1; }
-go run ./cmd/csvcheck "$CSV"
+go run ./cmd/csvcheck -schema csv.v1 "$CSV"
 cd "$CORE"
 P_LINE="$(SIGNER=alice LABEL=provider cargo run -q -p offchain-agent-registry)"
 C_LINE="$(SIGNER=bob LABEL=consumer cargo run -q -p offchain-agent-registry)"
@@ -14,9 +14,9 @@ CONSUMER_DID="$(echo "$C_LINE" | sed -n "s/^DID=0x//p" | tail -n 1)"
 sleep 6
 cd "$ROOT"
 EXP=$(( $(date +%s) + 3600 ))
-LIST_JSON="$(SIGNER=alice go run ./cmd/offer-sign -action listing -did "$PROVIDER_DID" -title "csv schema v1" -price 1000 -exp "$EXP")"
+LIST_JSON="$(SIGNER=alice go run ./cmd/offer-sign -action listing -did "$PROVIDER_DID" -title "csv schema v1" -schema csv.v1 -price 1000 -exp "$EXP")"
 SIG="$(echo "$LIST_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)[\"signature\"])")"
-L="$(curl -sf -X POST http://127.0.0.1:8080/v1/listings -H "Content-Type: application/json" -d "{\"seller_did\":\"$PROVIDER_DID\",\"title\":\"csv schema v1\",\"price\":1000,\"expires_at\":$EXP,\"signature\":\"$SIG\"}")"
+L="$(curl -sf -X POST http://127.0.0.1:8080/v1/listings -H "Content-Type: application/json" -d "{\"seller_did\":\"$PROVIDER_DID\",\"title\":\"csv schema v1\",\"schema\":\"csv.v1\",\"price\":1000,\"expires_at\":$EXP,\"signature\":\"$SIG\"}")"
 LID="$(echo "$L" | python3 -c "import sys,json; print(json.load(sys.stdin)[\"id\"])")"
 OFF_JSON="$(SIGNER=bob go run ./cmd/offer-sign -action create -id "$LID" -did "$CONSUMER_DID" -price 1000 -exp "$EXP")"
 SIG="$(echo "$OFF_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)[\"signature\"])")"
@@ -48,7 +48,7 @@ AN="$(SIGNER=alice go run ./cmd/announce -id "$CID" -url http://127.0.0.1:8090 -
 SIG="$(echo "$AN" | python3 -c "import sys,json; print(json.load(sys.stdin)[\"signature\"])")"
 curl -sf -X POST "http://127.0.0.1:8080/v1/commitments/$CID/deliver" -H "Content-Type: application/json" -d "{\"url\":\"http://127.0.0.1:8090\",\"expires_at\":$EXP,\"signature\":\"$SIG\"}" >/dev/null
 go run ./cmd/pull -offer "$OID"
-go run ./cmd/csvcheck "$CSV"
+go run ./cmd/csvcheck -schema csv.v1 "$CSV"
 kill $PROV_PID >/dev/null 2>&1 || true
 cd "$CORE"
 ACTION=close SIGNER=bob COMMITMENT_ID="0x$CID" CONSUMER_DID="0x$CONSUMER_DID" MERKLE_ROOT="0x$ROOTHEX" TOTAL_CHUNKS="$CHUNKS" cargo run -q -p offchain-vector-db

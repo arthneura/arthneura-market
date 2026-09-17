@@ -10,18 +10,19 @@ type Listing struct {
     ID           int64  `json:"id"`
     SellerDid    string `json:"seller_did"`
     Title        string `json:"title"`
+    Schema       string `json:"schema"`
     Price        int64  `json:"price"`
     SellerStatus string `json:"seller_status,omitempty"`
     Capabilities int64  `json:"capabilities,omitempty"`
 }
 
-func (s *Store) CreateListing(ctx context.Context, seller []byte, title string, price int64) (Listing, error) {
+func (s *Store) CreateListing(ctx context.Context, seller []byte, title string, price int64, schema string) (Listing, error) {
     var id int64
     err := s.pool.QueryRow(ctx, `
-        INSERT INTO listings (seller_did, title, price)
-        VALUES ($1, $2, $3)
+        INSERT INTO listings (seller_did, title, price, schema)
+        VALUES ($1, $2, $3, $4)
         RETURNING id
-    `, seller, title, price).Scan(&id)
+    `, seller, title, price, schema).Scan(&id)
     if err != nil {
         return Listing{}, err
     }
@@ -29,13 +30,14 @@ func (s *Store) CreateListing(ctx context.Context, seller []byte, title string, 
         ID:        id,
         SellerDid: hex.EncodeToString(seller),
         Title:     title,
+        Schema:    schema,
         Price:     price,
     }, nil
 }
 
 func (s *Store) ListListings(ctx context.Context, status string, cap int64) ([]Listing, error) {
     rows, err := s.pool.Query(ctx, `
-        SELECT l.id, l.seller_did, l.title, l.price,
+        SELECT l.id, l.seller_did, l.title, l.price, COALESCE(l.schema, ''),
                COALESCE(a.status, 'active'), COALESCE(a.capabilities, 0)
         FROM listings l
         LEFT JOIN agents a ON a.did = l.seller_did
@@ -51,14 +53,15 @@ func (s *Store) ListListings(ctx context.Context, status string, cap int64) ([]L
     for rows.Next() {
         var id, price, caps int64
         var did []byte
-        var title, st string
-        if err := rows.Scan(&id, &did, &title, &price, &st, &caps); err != nil {
+        var title, schema, st string
+        if err := rows.Scan(&id, &did, &title, &price, &schema, &st, &caps); err != nil {
             return nil, err
         }
         out = append(out, Listing{
             ID:           id,
             SellerDid:    hex.EncodeToString(did),
             Title:        title,
+            Schema:       schema,
             Price:        price,
             SellerStatus: st,
             Capabilities: caps,
@@ -77,13 +80,13 @@ func DecodeDid(h string) ([]byte, error) {
 
 func (s *Store) GetListing(ctx context.Context, id int64) (Listing, error) {
     var seller []byte
-    var title string
+    var title, schema string
     var price int64
     err := s.pool.QueryRow(ctx, `
-        SELECT id, seller_did, title, price FROM listings WHERE id = $1
-    `, id).Scan(&id, &seller, &title, &price)
+        SELECT id, seller_did, title, price, COALESCE(schema, '') FROM listings WHERE id = $1
+    `, id).Scan(&id, &seller, &title, &price, &schema)
     if err != nil {
         return Listing{}, err
     }
-    return Listing{ID: id, SellerDid: hex.EncodeToString(seller), Title: title, Price: price}, nil
+    return Listing{ID: id, SellerDid: hex.EncodeToString(seller), Title: title, Schema: schema, Price: price}, nil
 }

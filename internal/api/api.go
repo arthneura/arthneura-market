@@ -153,6 +153,7 @@ func NewMux(db *store.Store) *http.ServeMux {
         var body struct {
             SellerDid string `json:"seller_did"`
             Title     string `json:"title"`
+            Schema    string `json:"schema"`
             Price     int64  `json:"price"`
             ExpiresAt int64  `json:"expires_at"`
             Signature string `json:"signature"`
@@ -198,11 +199,11 @@ func NewMux(db *store.Store) *http.ServeMux {
         var sig [64]byte
         copy(pub[:], ctrl)
         copy(sig[:], sigb)
-        if err := offersign.VerifyListing(pub, sig, body.SellerDid, body.Title, body.Price, body.ExpiresAt); err != nil {
+        if err := offersign.VerifyListing(pub, sig, body.SellerDid, body.Title, body.Price, body.ExpiresAt, body.Schema); err != nil {
             writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
             return
         }
-        item, err := db.CreateListing(r.Context(), seller, body.Title, body.Price)
+        item, err := db.CreateListing(r.Context(), seller, body.Title, body.Price, body.Schema)
         if err != nil {
             writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
             return

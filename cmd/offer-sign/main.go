@@ -19,6 +19,7 @@ func main() {
     id := flag.Int64("id", 0, "listing id (create) or offer id (counter)")
     did := flag.String("did", "", "signer agent did hex")
     title := flag.String("title", "", "listing title (action=listing)")
+	schema := flag.String("schema", "", "listing schema id (action=listing)")
     price := flag.Int64("price", 0, "price")
     exp := flag.Int64("exp", time.Now().Unix()+1800, "unix expiry")
     flag.Parse()
@@ -32,7 +33,7 @@ func main() {
 
     var msg []byte
     if *action == "listing" {
-        msg = offersign.ListingMessage(*did, *title, *price, *exp)
+        msg = offersign.ListingMessage(*did, *title, *price, *exp, *schema)
     } else {
         msg = offersign.Message(*action, *id, *did, *price, *exp)
     }
@@ -47,6 +48,7 @@ func main() {
         "id":         *id,
         "did":        *did,
         "title":      *title,
+		"schema":     *schema,
         "price":      *price,
         "expires_at": *exp,
         "signature":  hex.EncodeToString(sig[:]),
