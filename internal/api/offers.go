@@ -239,6 +239,10 @@ func mountOffers(mux *http.ServeMux, db *store.Store) {
                 reason = ""
             }
         }
+        schema := off.Schema
+        if schema == "" {
+            schema = listing.Schema
+        }
         writeJSON(w, http.StatusOK, map[string]any{
             "offer_id":           off.ID,
             "provider_did":       provider,
@@ -248,6 +252,7 @@ func mountOffers(mux *http.ServeMux, db *store.Store) {
             "expires_in_blocks":  off.ExpiresInBlocks,
             "price":              off.Price,
             "commitment_id":      off.CommitmentID,
+            "schema":             schema,
             "ready":              ready,
             "reason":             reason,
         })
