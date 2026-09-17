@@ -241,6 +241,8 @@ func mountOffers(mux *http.ServeMux, db *store.Store) {
 				reason = "commitment not indexed"
 			} else if c.MerkleRoot != off.MerkleRoot || c.TotalChunks != off.TotalChunks {
 				reason = "offer spec does not match chain commitment"
+			} else if err := schema.Same(schemaID, c.Metadata); err != nil {
+				reason = "chain metadata does not match schema"
 			} else {
 				ready = true
 				reason = ""
