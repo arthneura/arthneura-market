@@ -23,3 +23,14 @@ func TestSignVerifyOffer(t *testing.T) {
         t.Fatal("wrong action must fail")
     }
 }
+
+func TestListingMessageIncludesSchema(t *testing.T) {
+    a := string(ListingMessage("aa", "csv leads v1", 1000, 1, "csv.v1"))
+    b := string(ListingMessage("aa", "csv leads v1", 1000, 1, ""))
+    if a == b {
+        t.Fatal("schema must change the signed bytes")
+    }
+    if want := "arthneura-listing|aa|csv leads v1|1000|1|csv.v1"; a != want {
+        t.Fatalf("got %q", a)
+    }
+}

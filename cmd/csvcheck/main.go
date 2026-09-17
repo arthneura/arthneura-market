@@ -2,17 +2,24 @@ package main
 
 import (
     "encoding/csv"
+    "flag"
     "fmt"
     "os"
     "strings"
 )
 
 func main() {
-    if len(os.Args) < 2 {
-        fmt.Fprintln(os.Stderr, "usage: csvcheck FILE")
+    schema := flag.String("schema", "", "schema id, e.g. csv.v1")
+    flag.Parse()
+    if flag.NArg() < 1 {
+        fmt.Fprintln(os.Stderr, "usage: csvcheck [-schema csv.v1] FILE")
         os.Exit(2)
     }
-    row, reason, err := CheckFile(os.Args[1])
+    if *schema != "" && *schema != "csv.v1" {
+        fmt.Fprintf(os.Stderr, "ROW=-1 REASON=unknown_schema\n")
+        os.Exit(1)
+    }
+    row, reason, err := CheckFile(flag.Arg(0))
     if err != nil {
         fmt.Fprintf(os.Stderr, "ROW=%d REASON=%s\n", row, reason)
         os.Exit(1)

@@ -15,10 +15,10 @@ func Verify(controllerPub [32]byte, sig [64]byte, action string, id int64, did s
 }
 
 
-func ListingMessage(sellerDid, title string, price, expiresAt int64) []byte {
-    return []byte(fmt.Sprintf("arthneura-listing|%s|%s|%d|%d", sellerDid, title, price, expiresAt))
+func ListingMessage(sellerDid, title string, price, expiresAt int64, schema string) []byte {
+    return []byte(fmt.Sprintf("arthneura-listing|%s|%s|%d|%d|%s", sellerDid, title, price, expiresAt, schema))
 }
 
-func VerifyListing(controllerPub [32]byte, sig [64]byte, sellerDid, title string, price, expiresAt int64) error {
-    return announce.Verify(controllerPub, sig, ListingMessage(sellerDid, title, price, expiresAt), expiresAt)
+func VerifyListing(controllerPub [32]byte, sig [64]byte, sellerDid, title string, price, expiresAt int64, schema string) error {
+    return announce.Verify(controllerPub, sig, ListingMessage(sellerDid, title, price, expiresAt, schema), expiresAt)
 }

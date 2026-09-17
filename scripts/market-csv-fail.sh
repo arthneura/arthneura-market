@@ -6,7 +6,7 @@ CSV="$ROOT/testdata/csv/bad-email.csv"
 cd "$ROOT"
 curl -sf http://127.0.0.1:8080/health >/dev/null || { echo "ERROR api down"; exit 1; }
 set +e
-CHK="$(go run ./cmd/csvcheck "$CSV" 2>&1)"
+CHK="$(go run ./cmd/csvcheck -schema csv.v1 "$CSV" 2>&1)"
 CHK_OK=$?
 set -e
 echo "$CHK"
@@ -19,9 +19,9 @@ CONSUMER_DID="$(echo "$C_LINE" | sed -n "s/^DID=0x//p" | tail -n 1)"
 sleep 6
 cd "$ROOT"
 EXP=$(( $(date +%s) + 3600 ))
-LIST_JSON="$(SIGNER=alice go run ./cmd/offer-sign -action listing -did "$PROVIDER_DID" -title "csv schema v1" -price 1000 -exp "$EXP")"
+LIST_JSON="$(SIGNER=alice go run ./cmd/offer-sign -action listing -did "$PROVIDER_DID" -title "csv schema v1" -schema csv.v1 -price 1000 -exp "$EXP")"
 SIG="$(echo "$LIST_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)[\"signature\"])")"
-L="$(curl -sf -X POST http://127.0.0.1:8080/v1/listings -H "Content-Type: application/json" -d "{\"seller_did\":\"$PROVIDER_DID\",\"title\":\"csv schema v1\",\"price\":1000,\"expires_at\":$EXP,\"signature\":\"$SIG\"}")"
+L="$(curl -sf -X POST http://127.0.0.1:8080/v1/listings -H "Content-Type: application/json" -d "{\"seller_did\":\"$PROVIDER_DID\",\"title\":\"csv schema v1\",\"schema\":\"csv.v1\",\"price\":1000,\"expires_at\":$EXP,\"signature\":\"$SIG\"}")"
 LID="$(echo "$L" | python3 -c "import sys,json; print(json.load(sys.stdin)[\"id\"])")"
 OFF_JSON="$(SIGNER=bob go run ./cmd/offer-sign -action create -id "$LID" -did "$CONSUMER_DID" -price 1000 -exp "$EXP")"
 SIG="$(echo "$OFF_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)[\"signature\"])")"
@@ -57,7 +57,7 @@ RECV="$(echo "$PULL_OUT" | sed -n "s/^RECEIVED_FILE=//p" | tail -n 1)"
 HASH0="$(echo "$PULL_OUT" | sed -n "s/^CHUNK_HASH_0=0x//p" | tail -n 1)"
 [ -n "$RECV" ] && [ -n "$HASH0" ] || { echo "ERROR evidence missing"; echo "$PULL_OUT"; exit 1; }
 set +e
-CHK="$(go run ./cmd/csvcheck "$RECV" 2>&1)"
+CHK="$(go run ./cmd/csvcheck -schema csv.v1 "$RECV" 2>&1)"
 CSV_OK=$?
 set -e
 echo "$CHK"
