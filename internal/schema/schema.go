@@ -7,6 +7,7 @@ import (
 
 const CSVv1 = "csv.v1"
 const BytesV1 = "bytes.v1"
+const APIv1 = "api.v1"
 
 func Canonical(s string) (string, error) {
 	id := strings.TrimSpace(s)
@@ -14,7 +15,7 @@ func Canonical(s string) (string, error) {
 		return "", fmt.Errorf("schema missing")
 	}
 	switch id {
-	case CSVv1, BytesV1:
+	case CSVv1, BytesV1, APIv1:
 		return id, nil
 	default:
 		return "", fmt.Errorf("unknown schema %q", id)
