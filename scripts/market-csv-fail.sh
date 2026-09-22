@@ -13,8 +13,11 @@ set -e
 echo "$CHK"
 [ "$CHK_OK" -ne 0 ] || { echo "ERROR csv should fail"; exit 1; }
 cd "$CORE"
-P_LINE="$(SIGNER=alice LABEL=provider cargo run -q -p offchain-agent-registry)"
-C_LINE="$(SIGNER=bob LABEL=consumer cargo run -q -p offchain-agent-registry)"
+ALICE_DIR="${ALICE_DIR:-$HOME/agents/alice}"
+BOB_DIR="${BOB_DIR:-$HOME/agents/bob}"
+mkdir -p "$ALICE_DIR" "$BOB_DIR"
+P_LINE="$(KEYSTORE_DIR="$ALICE_DIR" KEY_LABEL=alice SIGNER=alice LABEL=provider cargo run -q -p offchain-agent-registry)"
+C_LINE="$(KEYSTORE_DIR="$BOB_DIR" KEY_LABEL=bob SIGNER=bob LABEL=consumer cargo run -q -p offchain-agent-registry)"
 PROVIDER_DID="$(echo "$P_LINE" | sed -n "s/^DID=0x//p" | tail -n 1)"
 CONSUMER_DID="$(echo "$C_LINE" | sed -n "s/^DID=0x//p" | tail -n 1)"
 sleep 6
