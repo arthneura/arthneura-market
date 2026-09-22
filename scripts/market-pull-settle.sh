@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+DELIVER_URL="${DELIVER_URL:-http://127.0.0.1:8090}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CORE="${ARTHNEURA_CORE:-/Users/sumit/arthneura-core}"
 cd "$ROOT"
@@ -42,10 +43,10 @@ echo "=== provider + announce + pull ==="
 PAYLOAD="hello arthneura" go run ./cmd/provider -offer "$OID" &
 PROV_PID=$!
 sleep 2
-AN="$(SIGNER=alice go run ./cmd/announce -id "$CID" -url http://127.0.0.1:8090 -exp "$EXP")"
+AN="$(SIGNER=alice go run ./cmd/announce -id "$CID" -url "$DELIVER_URL" -exp "$EXP")"
 echo "$AN"
 SIG="$(echo "$AN" | python3 -c "import sys,json; print(json.load(sys.stdin)[\"signature\"])")"
-curl -sf -X POST "http://127.0.0.1:8080/v1/commitments/$CID/deliver" -H "Content-Type: application/json" -d "{\"url\":\"http://127.0.0.1:8090\",\"expires_at\":$EXP,\"signature\":\"$SIG\"}"
+curl -sf -X POST "http://127.0.0.1:8080/v1/commitments/$CID/deliver" -H "Content-Type: application/json" -d "{\"url\":\"$DELIVER_URL\",\"expires_at\":$EXP,\"signature\":\"$SIG\"}"
 echo
 go run ./cmd/pull -offer "$OID"
 kill $PROV_PID >/dev/null 2>&1 || true
