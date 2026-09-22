@@ -11,6 +11,10 @@ func TestCanonical(t *testing.T) {
 	if err != nil || ok != BytesV1 {
 		t.Fatalf("bytes.v1 should pass: %q %v", ok, err)
 	}
+	ok, err = Canonical("api.v1")
+	if err != nil || ok != APIv1 {
+		t.Fatalf("api.v1 should pass: %q %v", ok, err)
+	}
 	if _, err := Canonical(" csv.v1 "); err != nil {
 		t.Fatalf("trim should pass: %v", err)
 	}
@@ -34,6 +38,12 @@ func TestSame(t *testing.T) {
 	}
 	if err := Same("bytes.v1", "bytes.v1"); err != nil {
 		t.Fatal(err)
+	}
+	if err := Same("api.v1", "api.v1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := Same("api.v1", "bytes.v1"); err == nil {
+		t.Fatal("api vs bytes should fail")
 	}
 	if err := Same("csv.v1", "bytes.v1"); err == nil {
 		t.Fatal("csv vs bytes should fail")
