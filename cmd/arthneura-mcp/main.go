@@ -63,17 +63,48 @@ func stamp(_ context.Context, _ *mcp.CallToolRequest, in stampIn) (*mcp.CallTool
 	}, nil
 }
 
+type listOut struct {
+	Error string `json:"error,omitempty"`
+	N     int    `json:"n"`
+	Items any    `json:"items"`
+}
+
+func listListings(_ context.Context, _ *mcp.CallToolRequest, _ emptyIn) (*mcp.CallToolResult, listOut, error) {
+	items, err := market().ListListings()
+	if err != nil {
+		return nil, listOut{Error: err.Error()}, nil
+	}
+	return nil, listOut{N: len(items), Items: items}, nil
+}
+
+func listOffers(_ context.Context, _ *mcp.CallToolRequest, _ emptyIn) (*mcp.CallToolResult, listOut, error) {
+	items, err := market().ListOffers()
+	if err != nil {
+		return nil, listOut{Error: err.Error()}, nil
+	}
+	return nil, listOut{N: len(items), Items: items}, nil
+}
+
+type commitIn struct {
+	ID string `json:"id" jsonschema:"commitment id hex without 0x"`
+}
+
+func getCommitment(_ context.Context, _ *mcp.CallToolRequest, in commitIn) (*mcp.CallToolResult, client.Commitment, error) {
+	item, err := market().GetCommitment(in.ID)
+	if err != nil {
+		return nil, client.Commitment{}, err
+	}
+	return nil, item, nil
+}
+
 func main() {
 	log.SetOutput(os.Stderr)
-	s := mcp.NewServer(&mcp.Implementation{Name: "arthneura", Version: "0.1.0"}, nil)
-	mcp.AddTool(s, &mcp.Tool{
-		Name:        "arthneura_health",
-		Description: "Check ArthNeura market API. No keys.",
-	}, health)
-	mcp.AddTool(s, &mcp.Tool{
-		Name:        "arthneura_stamp",
-		Description: "Read-only: is this offer ready for chain register_commitment.",
-	}, stamp)
+	s := mcp.NewServer(&mcp.Implementation{Name: "arthneura", Version: "0.1.1"}, nil)
+	mcp.AddTool(s, &mcp.Tool{Name: "arthneura_health", Description: "Check ArthNeura market API. No keys."}, health)
+	mcp.AddTool(s, &mcp.Tool{Name: "arthneura_stamp", Description: "Read-only: offer ready for register_commitment?"}, stamp)
+	mcp.AddTool(s, &mcp.Tool{Name: "arthneura_list_listings", Description: "List market listings. Public read. No keys."}, listListings)
+	mcp.AddTool(s, &mcp.Tool{Name: "arthneura_list_offers", Description: "List market offers. Public read. No keys."}, listOffers)
+	mcp.AddTool(s, &mcp.Tool{Name: "arthneura_get_commitment", Description: "Get one commitment from the market index."}, getCommitment)
 	if err := s.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
