@@ -63,26 +63,32 @@ func stamp(_ context.Context, _ *mcp.CallToolRequest, in stampIn) (*mcp.CallTool
 	}, nil
 }
 
-type listOut struct {
-	Error string `json:"error,omitempty"`
-	N     int    `json:"n"`
-	Items any    `json:"items"`
+type listingsOut struct {
+	Error string           `json:"error,omitempty"`
+	N     int              `json:"n"`
+	Items []client.Listing `json:"items"`
 }
 
-func listListings(_ context.Context, _ *mcp.CallToolRequest, _ emptyIn) (*mcp.CallToolResult, listOut, error) {
+type offersOut struct {
+	Error string         `json:"error,omitempty"`
+	N     int            `json:"n"`
+	Items []client.Offer `json:"items"`
+}
+
+func listListings(_ context.Context, _ *mcp.CallToolRequest, _ emptyIn) (*mcp.CallToolResult, listingsOut, error) {
 	items, err := market().ListListings()
 	if err != nil {
-		return nil, listOut{Error: err.Error()}, nil
+		return nil, listingsOut{Error: err.Error()}, nil
 	}
-	return nil, listOut{N: len(items), Items: items}, nil
+	return nil, listingsOut{N: len(items), Items: items}, nil
 }
 
-func listOffers(_ context.Context, _ *mcp.CallToolRequest, _ emptyIn) (*mcp.CallToolResult, listOut, error) {
+func listOffers(_ context.Context, _ *mcp.CallToolRequest, _ emptyIn) (*mcp.CallToolResult, offersOut, error) {
 	items, err := market().ListOffers()
 	if err != nil {
-		return nil, listOut{Error: err.Error()}, nil
+		return nil, offersOut{Error: err.Error()}, nil
 	}
-	return nil, listOut{N: len(items), Items: items}, nil
+	return nil, offersOut{N: len(items), Items: items}, nil
 }
 
 type commitIn struct {
