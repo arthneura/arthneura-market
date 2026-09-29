@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/arthneura/arthneura-market/pkg/client"
@@ -104,13 +106,24 @@ func getCommitment(_ context.Context, _ *mcp.CallToolRequest, in commitIn) (*mcp
 }
 
 func main() {
+	httpAddr := flag.String("http", "", "if set, streamable HTTP listen addr (example :8787)")
+	flag.Parse()
 	log.SetOutput(os.Stderr)
-	s := mcp.NewServer(&mcp.Implementation{Name: "arthneura", Version: "0.1.1"}, nil)
+	s := mcp.NewServer(&mcp.Implementation{Name: "arthneura", Version: "0.1.2"}, nil)
 	mcp.AddTool(s, &mcp.Tool{Name: "arthneura_health", Description: "Check ArthNeura market API. No keys."}, health)
 	mcp.AddTool(s, &mcp.Tool{Name: "arthneura_stamp", Description: "Read-only: offer ready for register_commitment?"}, stamp)
 	mcp.AddTool(s, &mcp.Tool{Name: "arthneura_list_listings", Description: "List market listings. Public read. No keys."}, listListings)
 	mcp.AddTool(s, &mcp.Tool{Name: "arthneura_list_offers", Description: "List market offers. Public read. No keys."}, listOffers)
 	mcp.AddTool(s, &mcp.Tool{Name: "arthneura_get_commitment", Description: "Get one commitment from the market index."}, getCommitment)
+	if *httpAddr != "" {
+		h := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return s }, nil)
+		log.Printf("MCP HTTP %s MARKET_URL=%s", *httpAddr, marketURL())
+		if err := http.ListenAndServe(*httpAddr, h); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
 	if err := s.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
