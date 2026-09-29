@@ -1,58 +1,37 @@
 # Connect a desktop agent (lab)
 
-This is for owners who can drop a binary and a JSON file on their computer.
-Claude Desktop, OpenClaw, Cursor, Claude Code, Grok Build, Muse Code.
+PRE-TESTNET. Market API must be up: curl -sf http://127.0.0.1:8080/health
 
-Not ChatGPT.com / grok.com chat. Those need a hosted HTTP MCP later.
+## Claude Desktop (stdio)
 
-You do not clone this repo. You do not run docker compose unless you are hosting the lab API yourself.
+1. Build: ./scripts/build-mcp.sh
+2. Quit Claude Desktop
+3. Edit ~/Library/Application Support/Claude/claude_desktop_config.json
+   Keep existing keys. Set:
 
-## 1. Lab API
+    "mcpServers": {
+      "arthneura": {
+        "command": "/Users/YOU/arthneura-market/dist/arthneura-mcp",
+        "args": [],
+        "env": { "MARKET_URL": "http://127.0.0.1:8080" }
+      }
+    }
 
-Local: MARKET_URL=http://127.0.0.1:8080
-Hosted lab when it exists: MARKET_URL=https://api.arthneura.com
+4. Reopen Claude. Prompt: Call arthneura_health
+5. Allow the tool once.
 
-Health: GET $MARKET_URL/health -> {"ok":true}
-The MCP process never talks to chain RPC 9944.
+Strangers should not be sent this folder path. They wait for a hosted MCP URL.
 
-## 2. Binary
+## URL clients (Cursor, OpenClaw, ChatGPT custom connector)
 
-./scripts/build-mcp.sh
-Writes dist/arthneura-mcp for this OS.
-chmod +x dist/arthneura-mcp
+Same binary, HTTP flag:
 
-## 3. Claude Desktop
+    MARKET_URL=http://127.0.0.1:8080 ./dist/arthneura-mcp -http :8787
 
-macOS: ~/Library/Application Support/Claude/claude_desktop_config.json
-Windows: %APPDATA%\\Claude\\claude_desktop_config.json
+Client URL: http://127.0.0.1:8787
 
-command = ABSOLUTE path to dist/arthneura-mcp
-env MARKET_URL = http://127.0.0.1:8080
+ChatGPT and Claude Connectors need a public HTTPS URL. That is not this lab.
 
-Quit Claude Desktop fully. Reopen. Ask: Call arthneura_health.
+## Limits
 
-## 4. OpenClaw
-
-Settings -> MCP -> Add server -> Stdio.
-Same command path. Env MARKET_URL.
-
-openclaw mcp add arthneura --command /ABSOLUTE/PATH/dist/arthneura-mcp
-
-## 5. Cursor / Claude Code / Grok Build / Muse Code
-
-One stdio server. command = binary. env MARKET_URL.
-Do not point these tools at ws://127.0.0.1:9944.
-
-## 6. Tools v1 (read only)
-
-arthneura_health
-arthneura_stamp
-arthneura_list_listings
-arthneura_list_offers
-arthneura_get_commitment
-
-Listing create and register_commitment stay with the owner.
-
-## 7. Limits
-
-PRE-TESTNET lab. No ChatGPT store in this doc.
+Not the ChatGPT store. No compose for end users unless they host the lab API.
