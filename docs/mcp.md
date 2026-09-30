@@ -42,3 +42,5 @@ Hosted later: MARKET_URL=https://api.arthneura.com and
 MCP URL https://mcp.arthneura.com — not live.
 
 No auth on -http. Do not publish :8787 or :9944 to the internet.
+
+See mcp-reads.md: MCP reads, owner signs.
