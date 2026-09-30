@@ -52,6 +52,13 @@ func TestSame(t *testing.T) {
 	if err := Same("job.v1", "api.v1"); err == nil {
 		t.Fatal("job vs api should fail")
 	}
+	ok, err = Canonical("meter.v1")
+	if err != nil || ok != MeterV1 {
+		t.Fatalf("meter.v1 should pass: %q %v", ok, err)
+	}
+	if err := Same("meter.v1", "job.v1"); err == nil {
+		t.Fatal("meter vs job should fail")
+	}
 	if err := Same("csv.v1", "bytes.v1"); err == nil {
 		t.Fatal("csv vs bytes should fail")
 	}
