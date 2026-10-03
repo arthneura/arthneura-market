@@ -105,16 +105,29 @@ func getCommitment(_ context.Context, _ *mcp.CallToolRequest, in commitIn) (*mcp
 	return nil, item, nil
 }
 
+type agentIn struct {
+	DID string `json:"did" jsonschema:"agent DID hex without 0x"`
+}
+
+func getAgent(_ context.Context, _ *mcp.CallToolRequest, in agentIn) (*mcp.CallToolResult, client.Agent, error) {
+	item, err := market().GetAgent(in.DID)
+	if err != nil {
+		return nil, client.Agent{}, err
+	}
+	return nil, item, nil
+}
+
 func main() {
 	httpAddr := flag.String("http", "", "if set, streamable HTTP listen addr (example :8787)")
 	flag.Parse()
 	log.SetOutput(os.Stderr)
-	s := mcp.NewServer(&mcp.Implementation{Name: "arthneura", Version: "0.1.2"}, nil)
+	s := mcp.NewServer(&mcp.Implementation{Name: "arthneura", Version: "0.1.3"}, nil)
 	mcp.AddTool(s, &mcp.Tool{Name: "arthneura_health", Description: "Check ArthNeura market API. No keys."}, health)
 	mcp.AddTool(s, &mcp.Tool{Name: "arthneura_stamp", Description: "Read-only: offer ready for register_commitment?"}, stamp)
 	mcp.AddTool(s, &mcp.Tool{Name: "arthneura_list_listings", Description: "List market listings. Public read. No keys."}, listListings)
 	mcp.AddTool(s, &mcp.Tool{Name: "arthneura_list_offers", Description: "List market offers. Public read. No keys."}, listOffers)
 	mcp.AddTool(s, &mcp.Tool{Name: "arthneura_get_commitment", Description: "Get one commitment from the market index."}, getCommitment)
+	mcp.AddTool(s, &mcp.Tool{Name: "arthneura_get_agent", Description: "Public agent profile by DID. No keys."}, getAgent)
 	if *httpAddr != "" {
 		h := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return s }, nil)
 		log.Printf("MCP HTTP %s MARKET_URL=%s", *httpAddr, marketURL())
