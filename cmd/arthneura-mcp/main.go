@@ -7,6 +7,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
+	"strings"
 
 	"github.com/arthneura/arthneura-market/pkg/client"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -117,17 +119,71 @@ func getAgent(_ context.Context, _ *mcp.CallToolRequest, in agentIn) (*mcp.CallT
 	return nil, item, nil
 }
 
+type registerIn struct {
+	Label string `json:"label" jsonschema:"display label, ASCII letters numbers dash underscore"`
+}
+
+type registerOut struct {
+	DID   string `json:"did,omitempty"`
+	Key   string `json:"key,omitempty"`
+	Error string `json:"error,omitempty"`
+}
+
+func registerLocal(_ context.Context, _ *mcp.CallToolRequest, in registerIn) (*mcp.CallToolResult, registerOut, error) {
+	bin := os.Getenv("REGISTER_BIN")
+	if bin == "" {
+		return nil, registerOut{Error: "REGISTER_BIN not set"}, nil
+	}
+	label := strings.TrimSpace(in.Label)
+	if label == "" {
+		label = "me"
+	}
+	cmd := exec.Command(bin)
+	cmd.Env = append(os.Environ(),
+		"DOOR="+getenv("DOOR", "https://id.arthneura.com"),
+		"LABEL="+label,
+		"KEY_LABEL="+label,
+		"KEYSTORE_DIR="+getenv("KEYSTORE_DIR", os.Getenv("HOME")+"/agents/"+label),
+		"KEYSTORE_PASS="+getenv("KEYSTORE_PASS", "dev-passphrase"),
+	)
+	out, err := cmd.CombinedOutput()
+	text := strings.TrimSpace(string(out))
+	if err != nil {
+		return nil, registerOut{Error: text}, nil
+	}
+	var did, key string
+	for _, line := range strings.Split(text, "\n") {
+		if strings.HasPrefix(line, "DID=") {
+			did = strings.TrimPrefix(line, "DID=")
+		}
+		if strings.HasPrefix(line, "KEY=") {
+			key = strings.Trim(strings.TrimPrefix(line, "KEY="), `"`)
+		}
+	}
+	return nil, registerOut{DID: did, Key: key}, nil
+}
+
+func getenv(k, def string) string {
+	if v := os.Getenv(k); v != "" {
+		return v
+	}
+	return def
+}
+
 func main() {
 	httpAddr := flag.String("http", "", "if set, streamable HTTP listen addr (example :8787)")
 	flag.Parse()
 	log.SetOutput(os.Stderr)
-	s := mcp.NewServer(&mcp.Implementation{Name: "arthneura", Version: "0.1.3"}, nil)
+	s := mcp.NewServer(&mcp.Implementation{Name: "arthneura", Version: "0.1.4"}, nil)
 	mcp.AddTool(s, &mcp.Tool{Name: "arthneura_health", Description: "Check ArthNeura market API. No keys."}, health)
 	mcp.AddTool(s, &mcp.Tool{Name: "arthneura_stamp", Description: "Read-only: offer ready for register_commitment?"}, stamp)
 	mcp.AddTool(s, &mcp.Tool{Name: "arthneura_list_listings", Description: "List market listings. Public read. No keys."}, listListings)
 	mcp.AddTool(s, &mcp.Tool{Name: "arthneura_list_offers", Description: "List market offers. Public read. No keys."}, listOffers)
 	mcp.AddTool(s, &mcp.Tool{Name: "arthneura_get_commitment", Description: "Get one commitment from the market index."}, getCommitment)
 	mcp.AddTool(s, &mcp.Tool{Name: "arthneura_get_agent", Description: "Public agent profile by DID. No keys."}, getAgent)
+	if os.Getenv("REGISTER_BIN") != "" {
+		mcp.AddTool(s, &mcp.Tool{Name: "arthneura_register", Description: "Create a local key and register a DID. Runs only on this machine."}, registerLocal)
+	}
 	if *httpAddr != "" {
 		h := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return s }, nil)
 		log.Printf("MCP HTTP %s MARKET_URL=%s", *httpAddr, marketURL())
