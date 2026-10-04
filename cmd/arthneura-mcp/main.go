@@ -151,7 +151,11 @@ func listLocal(_ context.Context, _ *mcp.CallToolRequest, in listIn) (*mcp.CallT
 	if os.Getenv("OWNER_DID") == "" || os.Getenv("SIGNER") == "" {
 		return nil, listOut{Error: "OWNER_DID and SIGNER must be set on this machine"}, nil
 	}
-	cmd := exec.Command("go", "run", "./cmd/owner", "listing", "-title", in.Title, "-schema", in.Schema, "-price", fmt.Sprint(in.Price))
+	bin := os.Getenv("LIST_BIN")
+	if bin == "" {
+		return nil, listOut{Error: "LIST_BIN not set"}, nil
+	}
+	cmd := exec.Command(bin, "-title", in.Title, "-schema", in.Schema, "-price", fmt.Sprint(in.Price))
 	cmd.Env = os.Environ()
 	out, err := cmd.CombinedOutput()
 	text := strings.TrimSpace(string(out))
@@ -222,7 +226,7 @@ func main() {
 	if os.Getenv("REGISTER_BIN") != "" {
 		mcp.AddTool(s, &mcp.Tool{Name: "arthneura_register", Description: "Create a local key and register a DID. Runs only on this machine."}, registerLocal)
 
-		if os.Getenv("OWNER_DID") != "" && os.Getenv("SIGNER") != "" {
+		if os.Getenv("LIST_BIN") != "" && os.Getenv("OWNER_DID") != "" && os.Getenv("CONTROLLER_SEED") != "" {
 			mcp.AddTool(s, &mcp.Tool{Name: "arthneura_list", Description: "Sign a listing on this machine and post it. No chain lock."}, listLocal)
 		}
 	}
