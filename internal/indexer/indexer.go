@@ -157,6 +157,23 @@ func Run(ctx context.Context, ws, dsn string) error {
 		return fmt.Errorf("subscribe heads: %w", err)
 	}
 	defer sub.Unsubscribe()
+	if db != nil {
+		meta, err := api.RPC.State.GetMetadataLatest()
+		hash, herr := api.RPC.Chain.GetFinalizedHead()
+		if err == nil && herr == nil {
+			agents, _ := db.ListAgents(ctx)
+			for _, a := range agents {
+				if a.Label != "" {
+					continue
+				}
+				raw, decErr := hex.DecodeString(a.Did)
+				if decErr != nil {
+					continue
+				}
+				fillAgentLabel(ctx, api, db, meta, hash, raw)
+			}
+		}
+	}
 	log.Printf("listening on %s", ws)
 
 	for {
@@ -178,6 +195,54 @@ func setStatus(ctx context.Context, db *store.Store, id [32]byte, status string)
 	if err := db.SetCommitmentStatus(ctx, id[:], status); err != nil {
 		log.Printf("status %s id=%s: %v", status, hex.EncodeToString(id[:]), err)
 	}
+}
+
+func fillAgentLabel(ctx context.Context, api *gsrpc.SubstrateAPI, db *store.Store, meta *types.Metadata, hash types.Hash, did []byte) {
+	key, err := types.CreateStorageKey(meta, "AgentRegistry", "AgentProfiles", did)
+	if err != nil {
+		log.Printf("agent key: %v", err)
+		return
+	}
+	raw, err := api.RPC.State.GetStorageRaw(key, hash)
+	if err != nil || raw == nil || len(*raw) < 80 {
+		return
+	}
+	b := *raw
+	// did 32, controller 32, caps u64, score u32, status u8, registered u32, verified u8, scheme u8
+	i := 32 + 32 + 8 + 4 + 1 + 4 + 1 + 1
+	if i >= len(b) {
+		return
+	}
+	n, i, ok := compact(b, i)
+	if !ok || i+n > len(b) {
+		return
+	}
+	i += n
+	n, i, ok = compact(b, i)
+	if !ok || i+n > len(b) {
+		return
+	}
+	label := string(b[i : i+n])
+	var caps int64
+	if len(b) >= 72 {
+		caps = int64(b[64]) | int64(b[65])<<8 | int64(b[66])<<16 | int64(b[67])<<24
+	}
+	if err := db.SetAgentProfile(ctx, did, caps, label); err != nil {
+		log.Printf("agent label: %v", err)
+		return
+	}
+	log.Printf("AGENT label did=%s label=%q", hex.EncodeToString(did), label)
+}
+
+func compact(b []byte, i int) (int, int, bool) {
+	if i >= len(b) {
+		return 0, i, false
+	}
+	v := int(b[i])
+	if v&3 != 0 {
+		return 0, i, false
+	}
+	return v >> 2, i + 1, true
 }
 
 func handleHead(ctx context.Context, api *gsrpc.SubstrateAPI, db *store.Store, head types.Header) error {
@@ -224,6 +289,7 @@ func handleHead(ctx context.Context, api *gsrpc.SubstrateAPI, db *store.Store, h
 		log.Printf("AGENT registered block=#%d did=%s", head.Number, hex.EncodeToString(e.Did[:]))
 		if db != nil {
 			_ = db.UpsertAgent(ctx, e.Did[:], e.Controller[:], uint64(head.Number))
+			fillAgentLabel(ctx, api, db, meta, hash, e.Did[:])
 		}
 	}
 	for _, e := range events.VectorDb_CommitmentRegistered {
