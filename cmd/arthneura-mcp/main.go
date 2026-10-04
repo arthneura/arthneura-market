@@ -129,6 +129,44 @@ type registerOut struct {
 	Error string `json:"error,omitempty"`
 }
 
+type listIn struct {
+	Title  string `json:"title" jsonschema:"what to sell"`
+	Schema string `json:"schema" jsonschema:"csv.v1 bytes.v1 api.v1 job.v1 or meter.v1"`
+	Price  int64  `json:"price" jsonschema:"price, must be > 0"`
+}
+
+type listOut struct {
+	Error     string `json:"error,omitempty"`
+	ListingID string `json:"listing_id,omitempty"`
+	Text      string `json:"text,omitempty"`
+}
+
+func listLocal(_ context.Context, _ *mcp.CallToolRequest, in listIn) (*mcp.CallToolResult, listOut, error) {
+	if in.Title == "" || in.Price <= 0 {
+		return nil, listOut{Error: "title and price required"}, nil
+	}
+	if in.Schema == "" {
+		in.Schema = "csv.v1"
+	}
+	if os.Getenv("OWNER_DID") == "" || os.Getenv("SIGNER") == "" {
+		return nil, listOut{Error: "OWNER_DID and SIGNER must be set on this machine"}, nil
+	}
+	cmd := exec.Command("go", "run", "./cmd/owner", "listing", "-title", in.Title, "-schema", in.Schema, "-price", fmt.Sprint(in.Price))
+	cmd.Env = os.Environ()
+	out, err := cmd.CombinedOutput()
+	text := strings.TrimSpace(string(out))
+	if err != nil {
+		return nil, listOut{Error: text}, nil
+	}
+	id := ""
+	for _, line := range strings.Split(text, "\n") {
+		if strings.HasPrefix(line, "LISTING_ID=") {
+			id = strings.TrimPrefix(line, "LISTING_ID=")
+		}
+	}
+	return nil, listOut{ListingID: id, Text: text}, nil
+}
+
 func registerLocal(_ context.Context, _ *mcp.CallToolRequest, in registerIn) (*mcp.CallToolResult, registerOut, error) {
 	bin := os.Getenv("REGISTER_BIN")
 	if bin == "" {
@@ -183,6 +221,10 @@ func main() {
 	mcp.AddTool(s, &mcp.Tool{Name: "arthneura_get_agent", Description: "Public agent profile by DID. No keys."}, getAgent)
 	if os.Getenv("REGISTER_BIN") != "" {
 		mcp.AddTool(s, &mcp.Tool{Name: "arthneura_register", Description: "Create a local key and register a DID. Runs only on this machine."}, registerLocal)
+
+		if os.Getenv("OWNER_DID") != "" && os.Getenv("SIGNER") != "" {
+			mcp.AddTool(s, &mcp.Tool{Name: "arthneura_list", Description: "Sign a listing on this machine and post it. No chain lock."}, listLocal)
+		}
 	}
 	if *httpAddr != "" {
 		h := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return s }, nil)
