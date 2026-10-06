@@ -290,6 +290,43 @@ func offerLocal(_ context.Context, _ *mcp.CallToolRequest, in offerIn) (*mcp.Cal
 	return nil, offerOut{OfferID: id, Text: text}, nil
 }
 
+type ruleIn struct {
+	ListingID int64 `json:"listing_id" jsonschema:"listing this floor applies to"`
+	Floor     int64 `json:"floor" jsonschema:"reject offers below this price"`
+}
+
+type ruleOut struct {
+	Error string `json:"error,omitempty"`
+	Text  string `json:"text,omitempty"`
+}
+
+func ruleLocal(_ context.Context, _ *mcp.CallToolRequest, in ruleIn) (*mcp.CallToolResult, ruleOut, error) {
+	if in.ListingID <= 0 || in.Floor <= 0 {
+		return nil, ruleOut{Error: "listing_id and floor required"}, nil
+	}
+	dir := os.Getenv("OWNER_DIR")
+	if dir == "" {
+		if b, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), ".arthneura", "owner.dir")); err == nil {
+			dir = strings.TrimSpace(string(b))
+		}
+	}
+	if dir == "" {
+		return nil, ruleOut{Error: "OWNER_DIR not set"}, nil
+	}
+	bin := os.Getenv("RULE_BIN")
+	if bin == "" {
+		return nil, ruleOut{Error: "RULE_BIN not set"}, nil
+	}
+	cmd := exec.Command(bin, "-listing", fmt.Sprint(in.ListingID), "-floor", fmt.Sprint(in.Floor))
+	cmd.Env = append(os.Environ(), "OWNER_DIR="+dir)
+	out, err := cmd.CombinedOutput()
+	text := strings.TrimSpace(string(out))
+	if err != nil {
+		return nil, ruleOut{Error: text}, nil
+	}
+	return nil, ruleOut{Text: text}, nil
+}
+
 func main() {
 	httpAddr := flag.String("http", "", "if set, streamable HTTP listen addr (example :8787)")
 	flag.Parse()
@@ -307,6 +344,9 @@ func main() {
 		if os.Getenv("LIST_BIN") != "" {
 			if os.Getenv("OFFER_BIN") != "" {
 				mcp.AddTool(s, &mcp.Tool{Name: "arthneura_offer", Description: "Sign an offer on this machine and post it. No chain lock."}, offerLocal)
+			}
+			if os.Getenv("RULE_BIN") != "" {
+				mcp.AddTool(s, &mcp.Tool{Name: "arthneura_rule", Description: "Store a per-listing floor. Reject below, pick highest above. Does not accept."}, ruleLocal)
 			}
 			mcp.AddTool(s, &mcp.Tool{Name: "arthneura_list", Description: "Sign a listing on this machine and post it. No chain lock."}, listLocal)
 		}
