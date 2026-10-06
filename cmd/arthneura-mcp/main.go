@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/arthneura/arthneura-market/pkg/client"
@@ -148,15 +149,16 @@ func listLocal(_ context.Context, _ *mcp.CallToolRequest, in listIn) (*mcp.CallT
 	if in.Schema == "" {
 		in.Schema = "csv.v1"
 	}
-	if os.Getenv("OWNER_DID") == "" || os.Getenv("CONTROLLER_SEED") == "" {
-		return nil, listOut{Error: "OWNER_DID and CONTROLLER_SEED must be set on this machine"}, nil
+	did, seed, err := ownerMaterial()
+	if err != nil {
+		return nil, listOut{Error: err.Error()}, nil
 	}
 	bin := os.Getenv("LIST_BIN")
 	if bin == "" {
 		return nil, listOut{Error: "LIST_BIN not set"}, nil
 	}
 	cmd := exec.Command(bin, "-title", in.Title, "-schema", in.Schema, "-price", fmt.Sprint(in.Price))
-	cmd.Env = os.Environ()
+	cmd.Env = append(os.Environ(), "OWNER_DID="+did, "CONTROLLER_SEED="+seed)
 	out, err := cmd.CombinedOutput()
 	text := strings.TrimSpace(string(out))
 	if err != nil {
@@ -169,6 +171,33 @@ func listLocal(_ context.Context, _ *mcp.CallToolRequest, in listIn) (*mcp.CallT
 		}
 	}
 	return nil, listOut{ListingID: id, Text: text}, nil
+}
+
+func ownerMaterial() (string, string, error) {
+	did := strings.TrimPrefix(os.Getenv("OWNER_DID"), "0x")
+	seed := strings.TrimSpace(os.Getenv("CONTROLLER_SEED"))
+	dir := os.Getenv("KEYSTORE_DIR")
+	if dir == "" {
+		dir = filepath.Join(os.Getenv("HOME"), "agents", "me")
+	}
+	if seed == "" {
+		b, err := os.ReadFile(filepath.Join(dir, "controller.seed"))
+		if err != nil {
+			return "", "", fmt.Errorf("controller.seed missing: register first")
+		}
+		seed = strings.TrimSpace(string(b))
+	}
+	if did == "" {
+		b, err := os.ReadFile(filepath.Join(dir, "owner.did"))
+		if err != nil {
+			return "", "", fmt.Errorf("owner.did missing: register first")
+		}
+		did = strings.TrimPrefix(strings.TrimSpace(string(b)), "0x")
+	}
+	if did == "" || seed == "" {
+		return "", "", fmt.Errorf("OWNER_DID and CONTROLLER_SEED missing")
+	}
+	return did, seed, nil
 }
 
 func registerLocal(_ context.Context, _ *mcp.CallToolRequest, in registerIn) (*mcp.CallToolResult, registerOut, error) {
@@ -226,7 +255,7 @@ func main() {
 	if os.Getenv("REGISTER_BIN") != "" {
 		mcp.AddTool(s, &mcp.Tool{Name: "arthneura_register", Description: "Create a local key and register a DID. Runs only on this machine."}, registerLocal)
 
-		if os.Getenv("LIST_BIN") != "" && os.Getenv("OWNER_DID") != "" && os.Getenv("CONTROLLER_SEED") != "" {
+		if os.Getenv("LIST_BIN") != "" {
 			mcp.AddTool(s, &mcp.Tool{Name: "arthneura_list", Description: "Sign a listing on this machine and post it. No chain lock."}, listLocal)
 		}
 	}
