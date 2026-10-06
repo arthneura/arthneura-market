@@ -148,8 +148,8 @@ func listLocal(_ context.Context, _ *mcp.CallToolRequest, in listIn) (*mcp.CallT
 	if in.Schema == "" {
 		in.Schema = "csv.v1"
 	}
-	if os.Getenv("OWNER_DID") == "" || os.Getenv("SIGNER") == "" {
-		return nil, listOut{Error: "OWNER_DID and SIGNER must be set on this machine"}, nil
+	if os.Getenv("OWNER_DID") == "" || os.Getenv("CONTROLLER_SEED") == "" {
+		return nil, listOut{Error: "OWNER_DID and CONTROLLER_SEED must be set on this machine"}, nil
 	}
 	bin := os.Getenv("LIST_BIN")
 	if bin == "" {
