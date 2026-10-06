@@ -178,6 +178,12 @@ func ownerMaterial() (string, string, error) {
 	seed := strings.TrimSpace(os.Getenv("CONTROLLER_SEED"))
 	dir := os.Getenv("KEYSTORE_DIR")
 	if dir == "" {
+		b, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), ".arthneura", "owner.dir"))
+		if err == nil {
+			dir = strings.TrimSpace(string(b))
+		}
+	}
+	if dir == "" {
 		dir = filepath.Join(os.Getenv("HOME"), "agents", "me")
 	}
 	if seed == "" {
@@ -216,6 +222,7 @@ func registerLocal(_ context.Context, _ *mcp.CallToolRequest, in registerIn) (*m
 		"KEY_LABEL="+label,
 		"KEYSTORE_DIR="+getenv("KEYSTORE_DIR", os.Getenv("HOME")+"/agents/"+label),
 		"KEYSTORE_PASS="+getenv("KEYSTORE_PASS", "dev-passphrase"),
+		"OWN_CONTROLLER=1",
 	)
 	out, err := cmd.CombinedOutput()
 	text := strings.TrimSpace(string(out))
@@ -231,6 +238,9 @@ func registerLocal(_ context.Context, _ *mcp.CallToolRequest, in registerIn) (*m
 			key = strings.Trim(strings.TrimPrefix(line, "KEY="), `"`)
 		}
 	}
+	_ = os.MkdirAll(filepath.Join(os.Getenv("HOME"), ".arthneura"), 0o700)
+	ks := getenv("KEYSTORE_DIR", filepath.Join(os.Getenv("HOME"), "agents", label))
+	_ = os.WriteFile(filepath.Join(os.Getenv("HOME"), ".arthneura", "owner.dir"), []byte(ks), 0o600)
 	return nil, registerOut{DID: did, Key: key}, nil
 }
 
