@@ -251,6 +251,45 @@ func getenv(k, def string) string {
 	return def
 }
 
+type offerIn struct {
+	ListingID int64 `json:"listing_id" jsonschema:"listing to offer on"`
+	Price     int64 `json:"price" jsonschema:"price, must be > 0"`
+}
+
+type offerOut struct {
+	Error   string `json:"error,omitempty"`
+	OfferID string `json:"offer_id,omitempty"`
+	Text    string `json:"text,omitempty"`
+}
+
+func offerLocal(_ context.Context, _ *mcp.CallToolRequest, in offerIn) (*mcp.CallToolResult, offerOut, error) {
+	if in.ListingID <= 0 || in.Price <= 0 {
+		return nil, offerOut{Error: "listing_id and price required"}, nil
+	}
+	did, seed, err := ownerMaterial()
+	if err != nil {
+		return nil, offerOut{Error: err.Error()}, nil
+	}
+	bin := os.Getenv("OFFER_BIN")
+	if bin == "" {
+		return nil, offerOut{Error: "OFFER_BIN not set"}, nil
+	}
+	cmd := exec.Command(bin, "-listing", fmt.Sprint(in.ListingID), "-price", fmt.Sprint(in.Price))
+	cmd.Env = append(os.Environ(), "OWNER_DID="+did, "CONTROLLER_SEED="+seed)
+	out, err := cmd.CombinedOutput()
+	text := strings.TrimSpace(string(out))
+	if err != nil {
+		return nil, offerOut{Error: text}, nil
+	}
+	id := ""
+	for _, line := range strings.Split(text, "\n") {
+		if strings.HasPrefix(line, "OFFER_ID=") {
+			id = strings.TrimPrefix(line, "OFFER_ID=")
+		}
+	}
+	return nil, offerOut{OfferID: id, Text: text}, nil
+}
+
 func main() {
 	httpAddr := flag.String("http", "", "if set, streamable HTTP listen addr (example :8787)")
 	flag.Parse()
@@ -266,6 +305,9 @@ func main() {
 		mcp.AddTool(s, &mcp.Tool{Name: "arthneura_register", Description: "Create a local key and register a DID. Runs only on this machine."}, registerLocal)
 
 		if os.Getenv("LIST_BIN") != "" {
+			if os.Getenv("OFFER_BIN") != "" {
+				mcp.AddTool(s, &mcp.Tool{Name: "arthneura_offer", Description: "Sign an offer on this machine and post it. No chain lock."}, offerLocal)
+			}
 			mcp.AddTool(s, &mcp.Tool{Name: "arthneura_list", Description: "Sign a listing on this machine and post it. No chain lock."}, listLocal)
 		}
 	}
