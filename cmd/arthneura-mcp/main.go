@@ -327,6 +327,42 @@ func ruleLocal(_ context.Context, _ *mcp.CallToolRequest, in ruleIn) (*mcp.CallT
 	return nil, ruleOut{Text: text}, nil
 }
 
+type decideOut struct {
+	Error string `json:"error,omitempty"`
+	Text  string `json:"text,omitempty"`
+}
+
+func decideLocal(_ context.Context, _ *mcp.CallToolRequest, _ emptyIn) (*mcp.CallToolResult, decideOut, error) {
+	dir := os.Getenv("OWNER_DIR")
+	if dir == "" {
+		if b, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), ".arthneura", "owner.dir")); err == nil {
+			dir = strings.TrimSpace(string(b))
+		}
+	}
+	did := os.Getenv("OWNER_DID")
+	seed := os.Getenv("CONTROLLER_SEED")
+	if dir != "" && (did == "" || seed == "") {
+		if b, err := os.ReadFile(filepath.Join(dir, "owner.did")); err == nil {
+			did = strings.TrimSpace(string(b))
+		}
+		if b, err := os.ReadFile(filepath.Join(dir, "controller.seed")); err == nil {
+			seed = strings.TrimSpace(string(b))
+		}
+	}
+	bin := os.Getenv("DECIDE_BIN")
+	if dir == "" || did == "" || seed == "" || bin == "" {
+		return nil, decideOut{Error: "DECIDE_BIN and owner drawer required"}, nil
+	}
+	cmd := exec.Command(bin)
+	cmd.Env = append(os.Environ(), "OWNER_DIR="+dir, "OWNER_DID="+did, "CONTROLLER_SEED="+seed)
+	out, err := cmd.CombinedOutput()
+	text := strings.TrimSpace(string(out))
+	if err != nil {
+		return nil, decideOut{Error: text}, nil
+	}
+	return nil, decideOut{Text: text}, nil
+}
+
 func main() {
 	httpAddr := flag.String("http", "", "if set, streamable HTTP listen addr (example :8787)")
 	flag.Parse()
@@ -344,6 +380,9 @@ func main() {
 		if os.Getenv("LIST_BIN") != "" {
 			if os.Getenv("OFFER_BIN") != "" {
 				mcp.AddTool(s, &mcp.Tool{Name: "arthneura_offer", Description: "Sign an offer on this machine and post it. No chain lock."}, offerLocal)
+			}
+			if os.Getenv("DECIDE_BIN") != "" {
+				mcp.AddTool(s, &mcp.Tool{Name: "arthneura_decide", Description: "Apply saved floors. Accept the highest open offer at or above the floor. Seller sign only."}, decideLocal)
 			}
 			if os.Getenv("RULE_BIN") != "" {
 				mcp.AddTool(s, &mcp.Tool{Name: "arthneura_rule", Description: "Store a per-listing floor. Reject below, pick highest above. Does not accept."}, ruleLocal)
