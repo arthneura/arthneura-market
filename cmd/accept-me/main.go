@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -34,10 +35,34 @@ func main() {
 	if base == "" {
 		base = "https://api.arthneura.com"
 	}
+	dir := strings.TrimSpace(os.Getenv("OWNER_DIR"))
+	if dir == "" {
+		home, _ := os.UserHomeDir()
+		b, err := os.ReadFile(filepath.Join(home, ".arthneura", "owner.dir"))
+		if err != nil {
+			log.Fatal("OWNER_DIR unset and no ~/.arthneura/owner.dir")
+		}
+		dir = strings.TrimSpace(string(b))
+	}
 	did := strings.TrimPrefix(strings.TrimSpace(os.Getenv("OWNER_DID")), "0x")
-	seedb, err := hex.DecodeString(strings.TrimSpace(os.Getenv("CONTROLLER_SEED")))
+	if did == "" {
+		b, err := os.ReadFile(filepath.Join(dir, "owner.did"))
+		if err != nil {
+			log.Fatal(err)
+		}
+		did = strings.TrimPrefix(strings.TrimSpace(string(b)), "0x")
+	}
+	seedHex := strings.TrimSpace(os.Getenv("CONTROLLER_SEED"))
+	if seedHex == "" {
+		b, err := os.ReadFile(filepath.Join(dir, "controller.seed"))
+		if err != nil {
+			log.Fatal(err)
+		}
+		seedHex = strings.TrimSpace(string(b))
+	}
+	seedb, err := hex.DecodeString(seedHex)
 	if err != nil || len(seedb) != 32 {
-		log.Fatal("CONTROLLER_SEED must be 32-byte hex")
+		log.Fatal("controller seed must be 32-byte hex")
 	}
 	var seed [32]byte
 	copy(seed[:], seedb)
