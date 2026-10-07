@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/arthneura/arthneura-market/pkg/client"
@@ -363,6 +364,36 @@ func decideLocal(_ context.Context, _ *mcp.CallToolRequest, _ emptyIn) (*mcp.Cal
 	return nil, decideOut{Text: text}, nil
 }
 
+type acceptIn struct {
+	Offer int64 `json:"offer" jsonschema:"offer id to sign"`
+}
+
+type acceptOut struct {
+	Error string `json:"error,omitempty"`
+	Text  string `json:"text,omitempty"`
+}
+
+func acceptLocal(_ context.Context, _ *mcp.CallToolRequest, in acceptIn) (*mcp.CallToolResult, acceptOut, error) {
+	bin := os.Getenv("ACCEPT_BIN")
+	if bin == "" || os.Getenv("OWNER_DIR") == "" {
+		return nil, acceptOut{Error: "ACCEPT_BIN and owner drawer required"}, nil
+	}
+	if in.Offer <= 0 {
+		return nil, acceptOut{Error: "offer id required"}, nil
+	}
+	cmd := exec.Command(bin, "-offer", strconv.FormatInt(in.Offer, 10))
+	cmd.Env = os.Environ()
+	out, err := cmd.CombinedOutput()
+	text := strings.TrimSpace(string(out))
+	if err != nil {
+		if text == "" {
+			text = err.Error()
+		}
+		return nil, acceptOut{Error: text}, nil
+	}
+	return nil, acceptOut{Text: text}, nil
+}
+
 func main() {
 	httpAddr := flag.String("http", "", "if set, streamable HTTP listen addr (example :8787)")
 	flag.Parse()
@@ -383,6 +414,9 @@ func main() {
 			}
 			if os.Getenv("DECIDE_BIN") != "" {
 				mcp.AddTool(s, &mcp.Tool{Name: "arthneura_decide", Description: "Apply saved floors. Accept the highest open offer at or above the floor. Seller sign only."}, decideLocal)
+				if os.Getenv("ACCEPT_BIN") != "" {
+					mcp.AddTool(s, &mcp.Tool{Name: "arthneura_accept", Description: "Sign this offer with the local key. Other side of decide. No escrow."}, acceptLocal)
+				}
 			}
 			if os.Getenv("RULE_BIN") != "" {
 				mcp.AddTool(s, &mcp.Tool{Name: "arthneura_rule", Description: "Store a per-listing floor. Reject below, pick highest above. Does not accept."}, ruleLocal)
