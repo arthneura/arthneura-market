@@ -375,8 +375,8 @@ type acceptOut struct {
 
 func acceptLocal(_ context.Context, _ *mcp.CallToolRequest, in acceptIn) (*mcp.CallToolResult, acceptOut, error) {
 	bin := os.Getenv("ACCEPT_BIN")
-	if bin == "" || os.Getenv("OWNER_DIR") == "" {
-		return nil, acceptOut{Error: "ACCEPT_BIN and owner drawer required"}, nil
+	if bin == "" {
+		return nil, acceptOut{Error: "ACCEPT_BIN missing"}, nil
 	}
 	if in.Offer <= 0 {
 		return nil, acceptOut{Error: "offer id required"}, nil
