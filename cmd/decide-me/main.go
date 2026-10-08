@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -32,12 +33,37 @@ type offer struct {
 
 func main() {
 	log.SetFlags(0)
-	dir := os.Getenv("OWNER_DIR")
+	dir := strings.TrimSpace(os.Getenv("OWNER_DIR"))
+	if dir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			log.Fatal(err)
+		}
+		b, err := os.ReadFile(filepath.Join(home, ".arthneura", "owner.dir"))
+		if err != nil {
+			log.Fatal("OWNER_DIR required")
+		}
+		dir = strings.TrimSpace(string(b))
+	}
 	did := strings.TrimPrefix(strings.TrimSpace(os.Getenv("OWNER_DID")), "0x")
+	if did == "" {
+		b, err := os.ReadFile(filepath.Join(dir, "owner.did"))
+		if err != nil {
+			log.Fatal(err)
+		}
+		did = strings.TrimPrefix(strings.TrimSpace(string(b)), "0x")
+	}
 	seedHex := strings.TrimPrefix(strings.TrimSpace(os.Getenv("CONTROLLER_SEED")), "0x")
+	if seedHex == "" {
+		b, err := os.ReadFile(filepath.Join(dir, "controller.seed"))
+		if err != nil {
+			log.Fatal(err)
+		}
+		seedHex = strings.TrimSpace(string(b))
+	}
 	sb, err := hex.DecodeString(seedHex)
 	if dir == "" || did == "" || err != nil || len(sb) != 32 {
-		log.Fatal("OWNER_DIR, OWNER_DID, CONTROLLER_SEED required")
+		log.Fatal("drawer did and seed required")
 	}
 	var seed [32]byte
 	copy(seed[:], sb)

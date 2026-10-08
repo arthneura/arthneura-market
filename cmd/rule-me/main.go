@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type rule struct {
@@ -22,7 +23,18 @@ func main() {
 	if *lid <= 0 || *floor <= 0 {
 		log.Fatal("need -listing and -floor")
 	}
-	dir := os.Getenv("OWNER_DIR")
+	dir := strings.TrimSpace(os.Getenv("OWNER_DIR"))
+	if dir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			log.Fatal(err)
+		}
+		b, err := os.ReadFile(filepath.Join(home, ".arthneura", "owner.dir"))
+		if err != nil {
+			log.Fatal("OWNER_DIR required")
+		}
+		dir = strings.TrimSpace(string(b))
+	}
 	if dir == "" {
 		log.Fatal("OWNER_DIR required")
 	}
