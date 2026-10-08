@@ -179,7 +179,7 @@ func ownerMaterial() (string, string, error) {
 	seed := strings.TrimSpace(os.Getenv("CONTROLLER_SEED"))
 	dir := os.Getenv("KEYSTORE_DIR")
 	if dir == "" {
-		b, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), ".arthneura", "owner.dir"))
+		b, err := os.ReadFile(filepath.Join(mustHome(), ".arthneura", "owner.dir"))
 		if err == nil {
 			dir = strings.TrimSpace(string(b))
 		}
@@ -307,7 +307,7 @@ func ruleLocal(_ context.Context, _ *mcp.CallToolRequest, in ruleIn) (*mcp.CallT
 	}
 	dir := os.Getenv("OWNER_DIR")
 	if dir == "" {
-		if b, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), ".arthneura", "owner.dir")); err == nil {
+		if b, err := os.ReadFile(filepath.Join(mustHome(), ".arthneura", "owner.dir")); err == nil {
 			dir = strings.TrimSpace(string(b))
 		}
 	}
@@ -336,7 +336,7 @@ type decideOut struct {
 func decideLocal(_ context.Context, _ *mcp.CallToolRequest, _ emptyIn) (*mcp.CallToolResult, decideOut, error) {
 	dir := os.Getenv("OWNER_DIR")
 	if dir == "" {
-		if b, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), ".arthneura", "owner.dir")); err == nil {
+		if b, err := os.ReadFile(filepath.Join(mustHome(), ".arthneura", "owner.dir")); err == nil {
 			dir = strings.TrimSpace(string(b))
 		}
 	}
@@ -437,4 +437,12 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func mustHome() string {
+	h, err := os.UserHomeDir()
+	if err != nil || h == "" {
+		return os.Getenv("HOME")
+	}
+	return h
 }
